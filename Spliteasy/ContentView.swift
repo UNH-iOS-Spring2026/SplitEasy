@@ -1,9 +1,10 @@
 //
-//  ContentView.swift
+//  ContentView 2.swift
 //  Spliteasy
 //
-//  Created by SIDHARTHA JAVVADI on 3/11/26.
+//  Created by SIDHARTHA JAVVADI on 3/19/26.
 //
+
 
 import SwiftUI
 

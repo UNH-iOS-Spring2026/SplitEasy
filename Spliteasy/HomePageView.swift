@@ -1,10 +1,3 @@
-//
-//  HomePageView.swift
-//  Spliteasy
-//
-//  Created by SIDHARTHA JAVVADI on 3/17/26.
-//
-
 import SwiftUI
 
 struct HomePageView: View {
@@ -16,17 +9,22 @@ struct HomePageView: View {
     let onSelectItem: (BalanceItem) -> Void
 
     @State private var showFilterSheet = false
+    @State private var searchText = ""
 
     var body: some View {
         VStack(spacing: 0) {
             headerView(title: headerTitle)
+
+            searchBar
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
 
             homeSummaryCard
                 .padding(.top, 8)
 
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    ForEach(friendsData) { item in
+                    ForEach(filteredSearchFriends) { item in
                         Button {
                             onSelectItem(item)
                         } label: {
@@ -44,6 +42,18 @@ struct HomePageView: View {
         }
         .sheet(isPresented: $showFilterSheet) {
             FilterPageView(selectedFilter: $selectedFilter)
+        }
+    }
+
+    private var filteredSearchFriends: [BalanceItem] {
+        let trimmed = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.isEmpty {
+            return friendsData
+        }
+
+        return friendsData.filter {
+            $0.name.localizedCaseInsensitiveContains(trimmed)
         }
     }
 
@@ -65,24 +75,49 @@ struct HomePageView: View {
 
     private func headerView(title: String) -> some View {
         HStack {
-            Button(action: {}) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 26, weight: .regular))
-                    .foregroundColor(.black)
-            }
-
             Spacer()
 
-            Button(action: {}) {
-                Text(title)
-                    .font(.system(size: 24, weight: .bold))
-                    .italic()
-                    .foregroundColor(.black)
-            }
+            Text(title)
+                .font(.system(size: 24, weight: .bold))
+                .italic()
+                .foregroundColor(.black)
+                .padding(.trailing, 7)
         }
         .padding(.horizontal, 20)
         .padding(.top, -30)
-        .padding(.bottom, 4)
+        .padding(.bottom, 6)
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+
+            TextField("Search friends", text: $searchText)
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(.black)
+
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.purple.opacity(0.12), lineWidth: 1)
+                )
+                .shadow(color: Color.purple.opacity(0.06), radius: 8, x: 0, y: 4)
+        )
     }
 
     private var homeSummaryCard: some View {
