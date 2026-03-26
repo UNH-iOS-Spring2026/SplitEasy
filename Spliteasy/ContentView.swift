@@ -271,6 +271,15 @@ struct ContentView: View {
                 showAddFriendPage = false
                 showFriendDetailPage = false
             }
+
+            if selectedTab != .add {
+                showExpenseSelectionPage = false
+            }
+
+            if selectedTab != .home {
+                showSettleUpSelectionPage = false
+                showSettleUpPage = false
+            }
         }
     }
 
