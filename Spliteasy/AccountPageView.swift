@@ -1,356 +1,277 @@
 import SwiftUI
 
-struct AppNotificationItem: Identifiable, Hashable {
-    let id = UUID()
-    let title: String
-    let message: String
-    let timeText: String
-}
-
 struct AccountPageView: View {
     @Binding var showThemeMenu: Bool
     @Binding var profileName: String
-    @Binding var profileNickname: String
     @Binding var profileEmail: String
     @Binding var profilePhone: String
 
     let notifications: [AppNotificationItem]
-    let onSaveProfile: (_ name: String, _ nickname: String, _ email: String, _ phone: String, _ password: String) -> Void
-    let onSubmitFeedback: (_ rating: Int, _ message: String) -> Void
-    let onContactSupport: (_ subject: String, _ message: String) -> Void
+    let onSaveProfile: (String, String, String, String) -> Void
+    let onSubmitFeedback: (Int, String) -> Void
+    let onContactSupport: (String, String) -> Void
     let onSignOut: () -> Void
 
-    @State private var showEditProfileSheet = false
+    @State private var nicknameText: String = ""
+    @State private var emailText: String = ""
+    @State private var phoneText: String = ""
+    @State private var passwordText: String = ""
+
+    @State private var selectedImage: UIImage?
+    @State private var showImagePicker = false
+    @State private var profileImageURL: String = ""
+    @State private var isUploadingProfileImage = false
+    @State private var isSavingProfile = false
+    @State private var profileMessage: String = ""
+    @State private var profileMessageColor: Color = .green.opacity(0.85)
+
     @State private var showNotificationsSheet = false
     @State private var showFeedbackSheet = false
-    @State private var showContactSheet = false
-    @State private var selectedAvatarIndex: Int = 0
-
-    private let avatarOptions: [AvatarStyle] = [
-        AvatarStyle(
-            icon: "person.fill",
-            gradient: [Color(red: 0.08, green: 0.68, blue: 1.0), Color(red: 0.14, green: 0.55, blue: 0.98)]
-        ),
-        AvatarStyle(
-            icon: "person.crop.circle.fill",
-            gradient: [Color(red: 0.15, green: 0.78, blue: 1.0), Color(red: 0.32, green: 0.36, blue: 1.0)]
-        ),
-        AvatarStyle(
-            icon: "sparkles",
-            gradient: [Color(red: 0.12, green: 0.69, blue: 1.0), Color(red: 0.45, green: 0.22, blue: 0.98)]
-        ),
-        AvatarStyle(
-            icon: "moon.stars.fill",
-            gradient: [Color(red: 0.08, green: 0.72, blue: 1.0), Color(red: 0.18, green: 0.43, blue: 0.98)]
-        )
-    ]
+    @State private var showSupportSheet = false
+    @State private var feedbackRating = 0
+    @State private var feedbackMessage = ""
+    @State private var supportSubject = ""
+    @State private var supportMessage = ""
 
     var body: some View {
-        ScrollView(showsIndicators: false) {
-            VStack(spacing: 0) {
-                headerSection
-                    .padding(.horizontal, 20)
-                    .padding(.top, 0)
-
-                profileHeaderCard
-                    .padding(.top, 18)
-                    .padding(.horizontal, 20)
-
-                phoneCard
-                    .padding(.top, 18)
-                    .padding(.horizontal, 20)
-
-                emailCard
-                    .padding(.top, 18)
-                    .padding(.horizontal, 20)
-
-                notificationCard
-                    .padding(.top, 18)
-                    .padding(.horizontal, 20)
-
-                Button {
-                    showFeedbackSheet = true
-                } label: {
-                    singleOptionCard(
-                        iconName: "star",
-                        iconColor: Color.orange,
-                        iconBackground: Color.orange.opacity(0.12),
-                        title: "Feedback"
-                    )
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 18)
-                .padding(.horizontal, 20)
-
-                Button {
-                    showContactSheet = true
-                } label: {
-                    singleOptionCard(
-                        iconName: "message",
-                        iconColor: Color.teal,
-                        iconBackground: Color.teal.opacity(0.12),
-                        title: "Contact Us"
-                    )
-                }
-                .buttonStyle(.plain)
-                .padding(.top, 18)
-                .padding(.horizontal, 20)
-
-                signOutButton
-                    .padding(.top, 22)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 34)
-            }
-            .padding(.top, 8)
-        }
-        .ignoresSafeArea(edges: .top)
-        .background(
+        ZStack {
             LinearGradient(
                 colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-        )
-        .sheet(isPresented: $showEditProfileSheet) {
-            EditProfileSheet(
-                name: profileName,
-                nickname: profileNickname,
-                email: profileEmail,
-                phone: profilePhone,
-                selectedAvatarIndex: selectedAvatarIndex,
-                avatarOptions: avatarOptions,
-                onSave: { name, nickname, email, phone, password, avatarIndex in
-                    profileNickname = nickname.isEmpty ? "SID" : nickname
-                    selectedAvatarIndex = avatarIndex
-                    onSaveProfile(name, nickname, email, phone, password)
-                }
-            )
-        }
-        .sheet(isPresented: $showNotificationsSheet) {
-            NotificationsSheet(items: notifications)
-        }
-        .sheet(isPresented: $showFeedbackSheet) {
-            FeedbackSheet { rating, message in
-                onSubmitFeedback(rating, message)
-            }
-        }
-        .sheet(isPresented: $showContactSheet) {
-            ContactSupportSheet { subject, message in
-                onContactSupport(subject, message)
-            }
-        }
-    }
 
-    private var currentAvatar: AvatarStyle {
-        avatarOptions[selectedAvatarIndex % avatarOptions.count]
-    }
-
-    private var formattedProfilePhone: String {
-        formattedPhone(profilePhone)
-    }
-
-    private var headerSection: some View {
-        HStack {
-            ThemeHeaderButton(showThemeMenu: $showThemeMenu)
-
-            Spacer()
-
-            Button {
-                showEditProfileSheet = true
-            } label: {
-                Image(systemName: "pencil")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundColor(AppPalette.secondaryText)
-                    .frame(width: 46, height: 46)
+            VStack(spacing: 0) {
+                fixedHeaderView
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 12)
                     .background(
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(AppPalette.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .stroke(AppPalette.border, lineWidth: 1)
-                            )
-                    )
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 15)
-        }
-    }
-
-    private var profileHeaderCard: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(
                         LinearGradient(
-                            colors: currentAvatar.gradient,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                            startPoint: .top,
+                            endPoint: .bottom
                         )
                     )
-                    .frame(width: 78, height: 78)
-                    .shadow(color: AppPalette.accentMid.opacity(0.16), radius: 8, x: 0, y: 4)
+                    .zIndex(10)
 
-                Image(systemName: currentAvatar.icon)
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundColor(.white)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 18) {
+                        profileCard
+                        accountFieldsCard
+                        quickActionsCard
+                        supportActionsCard
+                        signOutButton
+
+                        Spacer(minLength: 120)
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 30)
+                }
             }
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(profileNickname.isEmpty ? "SID" : profileNickname)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(AppPalette.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-
-                Text(profileEmail)
-                    .font(.system(size: 14, weight: .regular))
-                    .foregroundColor(Color.blue.opacity(0.92))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+        }
+        .onAppear {
+            syncFromBindings()
+            loadProfile()
+        }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(image: $selectedImage)
+        }
+        .sheet(isPresented: $showNotificationsSheet) {
+            notificationsSheet
+        }
+        .sheet(isPresented: $showFeedbackSheet) {
+            feedbackSheet
+        }
+        .sheet(isPresented: $showSupportSheet) {
+            supportSheet
+        }
+        .onChange(of: selectedImage) { _, newImage in
+            uploadProfileImage(newImage)
+        }
+        .onChange(of: phoneText) { _, newValue in
+            let formatted = formattedPhone(newValue)
+            if formatted != newValue {
+                phoneText = formatted
+            } else {
+                clearProfileMessage()
             }
+        }
+        .onChange(of: nicknameText) { _, _ in
+            clearProfileMessage()
+        }
+        .onChange(of: emailText) { _, _ in
+            clearProfileMessage()
+        }
+        .onChange(of: passwordText) { _, _ in
+            clearProfileMessage()
+        }
+    }
+
+    private var fixedHeaderView: some View {
+        HStack {
+            ThemeHeaderButton(showThemeMenu: $showThemeMenu)
+                .padding(.top, -50)
 
             Spacer()
+
+            Text("Account")
+                .font(.system(size: 28, weight: .bold))
+                .italic()
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.top, -50)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .appCardStyle()
     }
 
-    private var phoneCard: some View {
-        singleInfoCard(
-            iconName: "phone",
-            iconColor: Color.blue.opacity(0.85),
-            iconBackground: Color.blue.opacity(0.12),
-            title: "Phone No",
-            trailingText: formattedProfilePhone.isEmpty ? "—" : formattedProfilePhone,
-            showCheck: true,
-            action: nil
-        )
-    }
+    private var profileCard: some View {
+        VStack(spacing: 12) {
+            Button {
+                showImagePicker = true
+            } label: {
+                ZStack {
+                    if let url = URL(string: profileImageURL),
+                       !profileImageURL.isEmpty,
+                       profileImageURL.lowercased().hasPrefix("http") {
+                        AsyncImage(url: url) { phase in
+                            switch phase {
+                            case .empty:
+                                Circle()
+                                    .fill(AppPalette.accentMid.opacity(0.18))
+                                    .frame(width: 96, height: 96)
+                                    .overlay(ProgressView())
 
-    private var emailCard: some View {
-        singleInfoCard(
-            iconName: "envelope",
-            iconColor: Color.pink.opacity(0.90),
-            iconBackground: Color.pink.opacity(0.12),
-            title: "Email",
-            trailingText: profileEmail,
-            showCheck: true,
-            action: nil
-        )
-    }
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 96, height: 96)
+                                    .clipShape(Circle())
 
-    private var notificationCard: some View {
-        singleInfoCard(
-            iconName: "bell",
-            iconColor: Color.purple.opacity(0.85),
-            iconBackground: Color.purple.opacity(0.12),
-            title: "Notification",
-            trailingText: nil,
-            showCheck: false,
-            action: {
-                showNotificationsSheet = true
-            }
-        )
-    }
+                            case .failure:
+                                defaultProfileCircle
 
-    private func singleInfoCard(
-        iconName: String,
-        iconColor: Color,
-        iconBackground: Color,
-        title: String,
-        trailingText: String?,
-        showCheck: Bool,
-        action: (() -> Void)?
-    ) -> some View {
-        Button {
-            action?()
-        } label: {
-            HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(iconBackground)
-                    .frame(width: 52, height: 52)
-                    .overlay(
-                        Image(systemName: iconName)
-                            .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(iconColor)
-                    )
+                            @unknown default:
+                                defaultProfileCircle
+                            }
+                        }
+                    } else {
+                        defaultProfileCircle
+                    }
 
-                Text(title)
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundColor(AppPalette.primaryText)
-
-                Spacer()
-
-                if let trailingText {
-                    Text(trailingText)
-                        .font(.system(size: 13))
-                        .foregroundColor(AppPalette.secondaryText)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                }
-
-                if showCheck {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.green)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(AppPalette.secondaryText.opacity(0.7))
+                    if isUploadingProfileImage {
+                        Circle()
+                            .fill(Color.black.opacity(0.25))
+                            .frame(width: 96, height: 96)
+                            .overlay(
+                                ProgressView()
+                                    .tint(.white)
+                            )
+                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(AppPalette.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(AppPalette.border, lineWidth: 1)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
+            .buttonStyle(.plain)
+            
 
-    private func singleOptionCard(
-        iconName: String,
-        iconColor: Color,
-        iconBackground: Color,
-        title: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 14)
-                .fill(iconBackground)
-                .frame(width: 52, height: 52)
-                .overlay(
-                    Image(systemName: iconName)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(iconColor)
-                )
-
-            Text(title)
-                .font(.system(size: 17, weight: .medium))
+            Text(displayNickname)
+                .font(.system(size: 24, weight: .bold))
                 .foregroundColor(AppPalette.primaryText)
 
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundColor(AppPalette.secondaryText.opacity(0.7))
+            Text(isUploadingProfileImage ? "Uploading image..." : "Tap image to update")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(AppPalette.border, lineWidth: 1)
+        .padding(.vertical, 22)
+        .frame(maxWidth: .infinity)
+        .background(cardBackground)
+    }
+
+    private var accountFieldsCard: some View {
+        VStack(spacing: 16) {
+            accountField(title: "Nick Name", text: $nicknameText, placeholder: "Enter nickname")
+            accountField(title: "Email", text: $emailText, placeholder: "Enter email", keyboard: .emailAddress)
+            accountField(title: "Phone", text: $phoneText, placeholder: "(xxx) xxx-xxxx", keyboard: .phonePad)
+
+            SecureField("New password (optional)", text: $passwordText)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(fieldBackground)
+
+            if !profileMessage.isEmpty {
+                Text(profileMessage)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(profileMessageColor)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button {
+                saveProfile()
+            } label: {
+                HStack(spacing: 10) {
+                    if isSavingProfile {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text("Save Profile")
+                        .font(.system(size: 18, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    LinearGradient(
+                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
                 )
-        )
+                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(isSavingProfile || isUploadingProfileImage || !canSaveProfile)
+            .opacity((isSavingProfile || isUploadingProfileImage || !canSaveProfile) ? 0.65 : 1)
+        }
+        .padding(18)
+        .background(cardBackground)
+    }
+
+    private var quickActionsCard: some View {
+        VStack(spacing: 12) {
+            profileActionRow(
+                icon: "bell.badge",
+                title: "Notifications",
+                subtitle: "\(notifications.count) recent"
+            ) {
+                showNotificationsSheet = true
+            }
+
+            profileActionRow(
+                icon: "star.bubble",
+                title: "Feedback",
+                subtitle: "Rate the app"
+            ) {
+                showFeedbackSheet = true
+            }
+        }
+        .padding(18)
+        .background(cardBackground)
+    }
+
+    private var supportActionsCard: some View {
+        VStack(spacing: 12) {
+            profileActionRow(
+                icon: "phone.circle",
+                title: "Contact Us",
+                subtitle: "Send your question"
+            ) {
+                showSupportSheet = true
+            }
+        }
+        .padding(18)
+        .background(cardBackground)
     }
 
     private var signOutButton: some View {
@@ -358,390 +279,119 @@ struct AccountPageView: View {
             onSignOut()
         } label: {
             Text("Sign Out")
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 18, weight: .bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
+                .padding(.vertical, 16)
                 .background(
-                    RoundedRectangle(cornerRadius: 16)
-                        .fill(
-                            LinearGradient(
-                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
-                        .shadow(color: AppPalette.accentMid.opacity(0.20), radius: 10, x: 0, y: 6)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(Color.red.opacity(0.88))
                 )
         }
         .buttonStyle(.plain)
     }
 
-    private func formattedPhone(_ input: String) -> String {
-        let digits = input.filter(\.isNumber)
-        guard !digits.isEmpty else { return "" }
-
-        let trimmed = String(digits.prefix(10))
-        let count = trimmed.count
-
-        if count <= 3 {
-            return "(\(trimmed)"
-        } else if count <= 6 {
-            let area = String(trimmed.prefix(3))
-            let rest = String(trimmed.dropFirst(3))
-            return "(\(area)) \(rest)"
-        } else {
-            let area = String(trimmed.prefix(3))
-            let middle = String(trimmed.dropFirst(3).prefix(3))
-            let last = String(trimmed.dropFirst(6))
-            return "(\(area)) \(middle)-\(last)"
-        }
-    }
-}
-
-struct AvatarStyle: Hashable {
-    let icon: String
-    let gradient: [Color]
-}
-
-struct EditProfileSheet: View {
-    @Environment(\.dismiss) private var dismiss
-
-    @State private var name: String
-    @State private var nickname: String
-    @State private var email: String
-    @State private var phone: String
-    @State private var selectedAvatarIndex: Int
-
-    @State private var showResetPassword = false
-    @State private var currentPassword: String = ""
-    @State private var newPassword: String = ""
-    @State private var confirmNewPassword: String = ""
-
-    let avatarOptions: [AvatarStyle]
-    let onSave: (_ name: String, _ nickname: String, _ email: String, _ phone: String, _ password: String, _ avatarIndex: Int) -> Void
-
-    init(
-        name: String,
-        nickname: String,
-        email: String,
-        phone: String,
-        selectedAvatarIndex: Int,
-        avatarOptions: [AvatarStyle],
-        onSave: @escaping (_ name: String, _ nickname: String, _ email: String, _ phone: String, _ password: String, _ avatarIndex: Int) -> Void
-    ) {
-        _name = State(initialValue: name)
-        _nickname = State(initialValue: nickname)
-        _email = State(initialValue: email)
-        _phone = State(initialValue: EditProfileSheet.formatPhone(phone))
-        _selectedAvatarIndex = State(initialValue: selectedAvatarIndex)
-        self.avatarOptions = avatarOptions
-        self.onSave = onSave
-    }
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 16) {
-                    profileEditorHeader
-
-                    sheetTextField(title: "Name", text: $name, placeholder: "Enter name")
-                    sheetTextField(title: "Mobile Number", text: $phone, placeholder: "Enter mobile number", isPhone: true)
-                    sheetTextField(title: "Email", text: $email, placeholder: "Enter email")
-                    sheetTextField(title: "Nickname", text: $nickname, placeholder: "Enter nickname")
-
-                    resetPasswordCard
-                }
-                .padding(20)
-            }
-            .background(
-                LinearGradient(
-                    colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
-            .navigationTitle("Edit Profile")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        let passwordToSave = showResetPassword ? newPassword : ""
-                        onSave(
-                            name.trimmingCharacters(in: .whitespacesAndNewlines),
-                            nickname.trimmingCharacters(in: .whitespacesAndNewlines),
-                            email.trimmingCharacters(in: .whitespacesAndNewlines),
-                            EditProfileSheet.formatPhone(phone),
-                            passwordToSave,
-                            selectedAvatarIndex
-                        )
-                        dismiss()
-                    }
-                    .disabled(!canSaveProfile)
-                }
-            }
-        }
-    }
-
-    private var currentAvatar: AvatarStyle {
-        avatarOptions[selectedAvatarIndex % avatarOptions.count]
-    }
-
-    private var profileEditorHeader: some View {
-        VStack(spacing: 10) {
-            Button {
-                selectedAvatarIndex = (selectedAvatarIndex + 1) % avatarOptions.count
-            } label: {
-                ZStack(alignment: .bottomTrailing) {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: currentAvatar.gradient,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .frame(width: 94, height: 94)
-                        .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 10, x: 0, y: 4)
-
-                    Image(systemName: currentAvatar.icon)
-                        .font(.system(size: 34, weight: .semibold))
-                        .foregroundColor(.white)
-
-                    Circle()
-                        .fill(AppPalette.card)
-                        .frame(width: 28, height: 28)
-                        .overlay(
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 12, weight: .bold))
-                                .foregroundColor(AppPalette.accentMid)
-                        )
-                        .offset(x: 4, y: 2)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Text(nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "SID" : nickname)
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundColor(AppPalette.primaryText)
-
-            Text("Tap photo to change")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(AppPalette.secondaryText)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.bottom, 4)
-    }
-
-    private func sheetTextField(
+    private func accountField(
         title: String,
         text: Binding<String>,
         placeholder: String,
-        isPhone: Bool = false
+        keyboard: UIKeyboardType = .default
     ) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 15, weight: Font.Weight.semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
 
             TextField(placeholder, text: text)
-                .onChange(of: text.wrappedValue) { _, newValue in
-                    if isPhone {
-                        text.wrappedValue = EditProfileSheet.formatPhone(newValue)
-                    }
-                }
-                .font(.system(size: 17, weight: Font.Weight.semibold))
+                .keyboardType(keyboard)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .font(.system(size: 16, weight: .semibold))
                 .foregroundColor(AppPalette.primaryText)
-                .padding(Edge.Set.horizontal, 14)
-                .padding(Edge.Set.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: RoundedCornerStyle.continuous)
-                        .fill(AppPalette.card)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: RoundedCornerStyle.continuous)
-                                .stroke(AppPalette.border, lineWidth: 1)
-                        )
-                )
-        }
-    }
-
-    private var resetPasswordCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showResetPassword.toggle()
-
-                    if !showResetPassword {
-                        currentPassword = ""
-                        newPassword = ""
-                        confirmNewPassword = ""
-                    }
-                }
-            } label: {
-                HStack {
-                    Text("Reset Password")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundColor(AppPalette.accentMid)
-
-                    Spacer()
-
-                    Image(systemName: showResetPassword ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(AppPalette.accentMid)
-                }
                 .padding(.horizontal, 14)
                 .padding(.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(AppPalette.card)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(AppPalette.border, lineWidth: 1)
-                        )
-                )
-            }
-            .buttonStyle(.plain)
+                .background(fieldBackground)
+        }
+    }
 
-            if showResetPassword {
-                VStack(spacing: 14) {
-                    secureInput(title: "Current Password", text: $currentPassword, placeholder: "Enter current password")
-                    secureInput(title: "New Password", text: $newPassword, placeholder: "Enter new password")
-                    secureInput(title: "Re-enter New Password", text: $confirmNewPassword, placeholder: "Re-enter new password")
+    private func profileActionRow(
+        icon: String,
+        title: String,
+        subtitle: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppPalette.rowIconBg)
+                        .frame(width: 50, height: 50)
 
-                    if !confirmNewPassword.isEmpty && newPassword != confirmNewPassword {
-                        Text("New passwords do not match")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.red.opacity(0.85))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(AppPalette.accentMid)
                 }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(AppPalette.primaryText)
+
+                    Text(subtitle)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppPalette.secondaryText)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(AppPalette.secondaryText)
             }
         }
+        .buttonStyle(.plain)
     }
 
-    private func secureInput(title: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(AppPalette.secondaryText)
-
-            SecureField(placeholder, text: text)
-                .textContentType(.oneTimeCode)
-                .autocorrectionDisabled(true)
-                .font(.system(size: 17, weight: Font.Weight.semibold))
-                .foregroundColor(AppPalette.primaryText)
-                .padding(Edge.Set.horizontal, 14)
-                .padding(Edge.Set.vertical, 14)
-                .background(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(AppPalette.card)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(AppPalette.border, lineWidth: 1)
-                        )
-                )
-        }
-    }
-
-    private var canSaveProfile: Bool {
-        let basicValid =
-            !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-            !nickname.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-
-        if !showResetPassword {
-            return basicValid
-        }
-
-        return basicValid &&
-            !currentPassword.isEmpty &&
-            !newPassword.isEmpty &&
-            !confirmNewPassword.isEmpty &&
-            newPassword == confirmNewPassword
-    }
-
-    private static func formatPhone(_ input: String) -> String {
-        let digits = input.filter(\.isNumber)
-        let trimmed = String(digits.prefix(10))
-        let count = trimmed.count
-
-        if count == 0 {
-            return ""
-        } else if count <= 3 {
-            return "(\(trimmed)"
-        } else if count <= 6 {
-            let area = String(trimmed.prefix(3))
-            let rest = String(trimmed.dropFirst(3))
-            return "(\(area)) \(rest)"
-        } else {
-            let area = String(trimmed.prefix(3))
-            let middle = String(trimmed.dropFirst(3).prefix(3))
-            let last = String(trimmed.dropFirst(6))
-            return "(\(area)) \(middle)-\(last)"
-        }
-    }
-}
-
-struct NotificationsSheet: View {
-    let items: [AppNotificationItem]
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
+    private var notificationsSheet: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
-                    if items.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "bell.slash")
-                                .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(AppPalette.secondaryText)
-
-                            Text("No recent notifications")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(AppPalette.secondaryText)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 60)
+                    if notifications.isEmpty {
+                        emptySheetState(
+                            icon: "bell.slash",
+                            title: "No notifications yet",
+                            subtitle: "Your recent reminders and updates will appear here."
+                        )
                     } else {
-                        ForEach(items) { item in
+                        ForEach(notifications) { item in
                             VStack(alignment: .leading, spacing: 6) {
-                                HStack {
-                                    Text(item.title)
-                                        .font(.system(size: 17, weight: .bold))
-                                        .foregroundColor(AppPalette.primaryText)
-
-                                    Spacer()
-
-                                    Text(item.timeText)
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundColor(AppPalette.secondaryText)
-                                }
+                                Text(item.title)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(AppPalette.primaryText)
 
                                 Text(item.message)
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(AppPalette.secondaryText)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Text(item.timeText)
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(AppPalette.accentMid)
                             }
                             .padding(16)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                             .background(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
                                     .fill(AppPalette.card)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
                                             .stroke(AppPalette.border, lineWidth: 1)
                                     )
                             )
                         }
                     }
                 }
-                .padding(20)
+                .padding()
             }
+            .navigationTitle("Notifications")
             .background(
                 LinearGradient(
                     colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
@@ -750,86 +400,69 @@ struct NotificationsSheet: View {
                 )
                 .ignoresSafeArea()
             )
-            .navigationTitle("Notifications")
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
         }
+        .presentationDetents([.medium, .large])
     }
-}
 
-struct FeedbackSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var rating: Int = 0
-    @State private var message: String = ""
-
-    let onSubmit: (_ rating: Int, _ message: String) -> Void
-
-    var body: some View {
+    private var feedbackSheet: some View {
         NavigationStack {
             VStack(spacing: 18) {
-                Text("Rate your experience")
+                Text("Rate the app")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(AppPalette.primaryText)
-                    .padding(.top, 16)
 
-                HStack(spacing: 12) {
-                    ForEach(1...5, id: \.self) { index in
+                HStack(spacing: 14) {
+                    ForEach(1...5, id: \.self) { value in
                         Button {
-                            rating = index
+                            feedbackRating = value
                         } label: {
-                            Image(systemName: rating >= index ? "star.fill" : "star")
-                                .font(.system(size: 28, weight: .bold))
-                                .foregroundColor(.orange)
+                            Image(systemName: value <= feedbackRating ? "star.fill" : "star")
+                                .font(.system(size: 26, weight: .bold))
+                                .foregroundColor(.yellow)
                         }
                         .buttonStyle(.plain)
                     }
                 }
 
-                TextEditor(text: $message)
-                    .frame(height: 180)
-                    .padding(12)
-                    .scrollContentBackground(.hidden)
+                TextEditor(text: $feedbackMessage)
+                    .frame(height: 160)
+                    .padding(10)
                     .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
                             .fill(AppPalette.card)
                             .overlay(
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
                                     .stroke(AppPalette.border, lineWidth: 1)
                             )
                     )
-                    .foregroundColor(AppPalette.primaryText)
 
                 Button {
-                    onSubmit(rating, message.trimmingCharacters(in: .whitespacesAndNewlines))
-                    dismiss()
+                    let trimmed = feedbackMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+                    onSubmitFeedback(feedbackRating, trimmed)
+                    feedbackRating = 0
+                    feedbackMessage = ""
+                    showFeedbackSheet = false
                 } label: {
                     Text("Submit Feedback")
-                        .font(.system(size: 17, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
+                            LinearGradient(
+                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(rating == 0)
 
                 Spacer()
             }
             .padding(20)
+            .navigationTitle("Feedback")
             .background(
                 LinearGradient(
                     colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
@@ -838,97 +471,61 @@ struct FeedbackSheet: View {
                 )
                 .ignoresSafeArea()
             )
-            .navigationTitle("Feedback")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
         }
+        .presentationDetents([.medium, .large])
     }
-}
 
-struct ContactSupportSheet: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var subject: String = ""
-    @State private var message: String = ""
-
-    let onSend: (_ subject: String, _ message: String) -> Void
-
-    var body: some View {
+    private var supportSheet: some View {
         NavigationStack {
             VStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Subject")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(AppPalette.secondaryText)
+                TextField("Subject", text: $supportSubject)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(AppPalette.primaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .background(fieldBackground)
 
-                    TextField("Enter subject", text: $subject)
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundColor(AppPalette.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 14)
-                        .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(AppPalette.card)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .stroke(AppPalette.border, lineWidth: 1)
-                                )
-                        )
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Message")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(AppPalette.secondaryText)
-
-                    TextEditor(text: $message)
-                        .frame(height: 220)
-                        .padding(12)
-                        .scrollContentBackground(.hidden)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(AppPalette.card)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                        .stroke(AppPalette.border, lineWidth: 1)
-                                )
-                        )
-                        .foregroundColor(AppPalette.primaryText)
-                }
+                TextEditor(text: $supportMessage)
+                    .frame(height: 180)
+                    .padding(10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .fill(AppPalette.card)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .stroke(AppPalette.border, lineWidth: 1)
+                            )
+                    )
 
                 Button {
-                    onSend(
-                        subject.trimmingCharacters(in: .whitespacesAndNewlines),
-                        message.trimmingCharacters(in: .whitespacesAndNewlines)
+                    onContactSupport(
+                        supportSubject.trimmingCharacters(in: .whitespacesAndNewlines),
+                        supportMessage.trimmingCharacters(in: .whitespacesAndNewlines)
                     )
-                    dismiss()
+                    supportSubject = ""
+                    supportMessage = ""
+                    showSupportSheet = false
                 } label: {
-                    Text("Send")
-                        .font(.system(size: 17, weight: .bold))
+                    Text("Send Message")
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
+                            LinearGradient(
+                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
+                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(subject.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                 Spacer()
             }
             .padding(20)
+            .navigationTitle("Contact Us")
             .background(
                 LinearGradient(
                     colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
@@ -937,14 +534,216 @@ struct ContactSupportSheet: View {
                 )
                 .ignoresSafeArea()
             )
-            .navigationTitle("Contact Us")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private var displayNickname: String {
+        let trimmed = nicknameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Add nickname" : trimmed
+    }
+
+    private var defaultProfileCircle: some View {
+        Circle()
+            .fill(AppPalette.accentMid.opacity(0.18))
+            .frame(width: 96, height: 96)
+            .overlay(
+                Image(systemName: "camera.fill")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(AppPalette.accentMid)
+            )
+    }
+
+    private var fieldBackground: some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(AppPalette.searchField)
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(AppPalette.border, lineWidth: 1)
+            )
+    }
+
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 24, style: .continuous)
+            .fill(AppPalette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(AppPalette.border, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
+    }
+
+    private func emptySheetState(icon: String, title: String, subtitle: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            Text(title)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundColor(AppPalette.primaryText)
+
+            Text(subtitle)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppPalette.secondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 40)
+    }
+
+    private var canSaveProfile: Bool {
+        !nicknameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !emailText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !phoneText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func syncFromBindings() {
+        nicknameText = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
+        emailText = profileEmail
+        phoneText = formattedPhone(profilePhone)
+    }
+
+    private func loadProfile() {
+        FirebaseService.shared.fetchCurrentUserProfile { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let profile):
+                    let cleanedNickname = profile.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let cleanedImageURL = profile.profileImageURL.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                    nicknameText = cleanedNickname
+                    emailText = profile.email.isEmpty ? (FirebaseService.shared.currentUserEmail ?? "") : profile.email
+                    phoneText = formattedPhone(profile.phone)
+
+                    profileName = cleanedNickname
+                    profileEmail = emailText
+                    profilePhone = phoneText
+
+                    if cleanedImageURL.lowercased().hasPrefix("http") {
+                        profileImageURL = cleanedImageURL
+                    } else {
+                        profileImageURL = ""
                     }
+
+                    profileMessage = ""
+
+                case .failure(let error):
+                    profileMessage = error.localizedDescription
+                    profileMessageColor = .red.opacity(0.85)
                 }
             }
         }
     }
+
+    private func uploadProfileImage(_ image: UIImage?) {
+        guard let image,
+              let data = image.jpegData(compressionQuality: 0.6) else { return }
+
+        clearProfileMessage()
+        isUploadingProfileImage = true
+
+        FirebaseService.shared.uploadCurrentUserProfileImage(data: data) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let url):
+                    profileImageURL = url
+
+                    FirebaseService.shared.updateCurrentUserProfileImageURL(url) { updateResult in
+                        DispatchQueue.main.async {
+                            isUploadingProfileImage = false
+
+                            switch updateResult {
+                            case .success:
+                                profileMessage = "Profile image updated."
+                                profileMessageColor = .green.opacity(0.85)
+
+                            case .failure(let error):
+                                profileImageURL = ""
+                                profileMessage = error.localizedDescription
+                                profileMessageColor = .red.opacity(0.85)
+                            }
+                        }
+                    }
+
+                case .failure(let error):
+                    isUploadingProfileImage = false
+                    profileImageURL = ""
+                    profileMessage = error.localizedDescription
+                    profileMessageColor = .red.opacity(0.85)
+                }
+            }
+        }
+    }
+    private func saveProfile() {
+        let trimmedNickname = nicknameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEmail = emailText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPhone = phoneText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        clearProfileMessage()
+        isSavingProfile = true
+
+        onSaveProfile(trimmedNickname, trimmedEmail, trimmedPhone, passwordText)
+
+        FirebaseService.shared.fetchCurrentUserProfile { result in
+            DispatchQueue.main.async {
+                isSavingProfile = false
+
+                switch result {
+                case .success(let profile):
+                    nicknameText = profile.nickname.trimmingCharacters(in: .whitespacesAndNewlines)
+                    emailText = profile.email.isEmpty ? trimmedEmail : profile.email
+                    phoneText = formattedPhone(profile.phone)
+
+                    profileName = nicknameText
+                    profileEmail = emailText
+                    profilePhone = phoneText
+
+                    profileMessage = passwordText.isEmpty
+                        ? "Profile saved successfully."
+                        : "Profile saved. Use Forgot Password on login if you want to reset password by email."
+                    profileMessageColor = .green.opacity(0.85)
+                    passwordText = ""
+
+                case .failure:
+                    profileName = trimmedNickname
+                    profileEmail = trimmedEmail
+                    profilePhone = trimmedPhone
+                    nicknameText = trimmedNickname
+
+                    profileMessage = passwordText.isEmpty
+                        ? "Profile saved successfully."
+                        : "Profile saved. Use Forgot Password on login if you want to reset password by email."
+                    profileMessageColor = .green.opacity(0.85)
+                    passwordText = ""
+                }
+            }
+        }
+    }
+
+    private func clearProfileMessage() {
+        if !isSavingProfile && !isUploadingProfileImage {
+            profileMessage = ""
+        }
+    }
+
+    private func formattedPhone(_ input: String) -> String {
+        let digits = input.filter(\.isNumber)
+        let limited = String(digits.prefix(10))
+
+        if limited.isEmpty { return "" }
+        if limited.count < 4 { return limited }
+        if limited.count < 7 {
+            let area = limited.prefix(3)
+            let rest = limited.dropFirst(3)
+            return "(\(area)) \(rest)"
+        }
+
+        let area = limited.prefix(3)
+        let middle = limited.dropFirst(3).prefix(3)
+        let last = limited.dropFirst(6)
+        return "(\(area)) \(middle)-\(last)"
+    }
 }
+
+

@@ -9,7 +9,7 @@ struct CreateGroupPageView: View {
     @State private var groupName: String = ""
     @State private var selectedGroupType: GroupType = .trip
     @State private var showFriendsList = false
-    @State private var selectedFriendIDs: Set<UUID> = []
+    @State private var selectedFriendIDs: Set<String> = []
     @State private var memberSearchText: String = ""
 
     private let cardBorder = AppPalette.border
@@ -344,7 +344,7 @@ struct CreateGroupPageView: View {
         return availableFriends.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
     }
 
-    private func toggleFriend(_ id: UUID) {
+    private func toggleFriend(_ id: String) {
         if selectedFriendIDs.contains(id) {
             selectedFriendIDs.remove(id)
         } else {
@@ -356,8 +356,6 @@ struct CreateGroupPageView: View {
         guard canSaveGroup else { return }
         let selectedFriends = availableFriends.filter { selectedFriendIDs.contains($0.id) }
         onSaveGroup(trimmedGroupName, selectedGroupType, selectedFriends)
-        showCreateGroupPage = false
-        selectedTab = .friends
     }
 
     private func avatarColor(for item: BalanceItem) -> Color {
@@ -387,6 +385,15 @@ enum GroupType: CaseIterable {
         case .room: return "house"
         case .couple: return "heart"
         case .others: return "square.grid.2x2"
+        }
+    }
+
+    var firestoreValue: String {
+        switch self {
+        case .trip: return "trip"
+        case .room: return "room"
+        case .couple: return "couple"
+        case .others: return "others"
         }
     }
 }

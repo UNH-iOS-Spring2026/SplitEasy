@@ -10,16 +10,13 @@ import FirebaseCore
 
 @main
 struct SplitEasyApp: App {
-
     init() {
         FirebaseApp.configure()
     }
 
     var body: some Scene {
         WindowGroup {
-            NavigationView {
-                ContentView()
-            }
+            ContentView()
         }
     }
 }

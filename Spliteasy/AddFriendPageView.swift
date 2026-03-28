@@ -30,7 +30,7 @@ struct AddFriendPageView: View {
 
                     friendNameCard
                     contactCard
-                    sendInvitationButton
+                    saveFriendButton
 
                     Spacer(minLength: 120)
                 }
@@ -132,16 +132,9 @@ struct AddFriendPageView: View {
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
 
-            Group {
-                #if os(iOS)
-                TextField("Enter phone number or email", text: $contactText)
-                    .keyboardType(.emailAddress)
-                #else
-                TextField("Enter phone number or email", text: $contactText)
-                #endif
-            }
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundColor(AppPalette.primaryText)
+            TextField("Enter phone number or email", text: $contactText)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
 
             Rectangle()
                 .fill(AppPalette.border)
@@ -160,15 +153,15 @@ struct AddFriendPageView: View {
         )
     }
 
-    private var sendInvitationButton: some View {
+    private var saveFriendButton: some View {
         Button {
-            print("Send invitation tapped")
+            saveFriend()
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: "paperplane.fill")
+                Image(systemName: "person.badge.plus")
                     .font(.system(size: 18, weight: .bold))
 
-                Text("Send Invitation")
+                Text("Save Friend")
                     .font(.system(size: 18, weight: .bold))
             }
             .foregroundColor(.white)
@@ -186,8 +179,10 @@ struct AddFriendPageView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
             .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
+            .opacity(trimmedName.isEmpty ? 0.65 : 1.0)
         }
         .buttonStyle(.plain)
+        .disabled(trimmedName.isEmpty)
     }
 
     private var trimmedName: String {
@@ -201,8 +196,5 @@ struct AddFriendPageView: View {
             trimmedName,
             contactText.trimmingCharacters(in: .whitespacesAndNewlines)
         )
-
-        showAddFriendPage = false
-        selectedTab = .friends
     }
 }

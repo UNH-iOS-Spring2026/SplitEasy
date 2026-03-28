@@ -12,80 +12,57 @@ struct ContentView: View {
     @State private var showSettleUpSelectionPage = false
     @State private var showSettleUpPage = false
     @State private var settleUpReturnToFriendDetail = false
-    @State private var monthlyLimit: Double = 2000.00
-    @State private var isLoggedIn = true
+    @State private var monthlyLimit: Double = 0.0
+    @State private var isLoggedIn = false
+    @State private var isCheckingSession = true
 
-    @AppStorage("appThemeMode") private var savedThemeMode: String = AppThemeMode.auto.rawValue
+    @State private var savedThemeMode: String = AppThemeMode.auto.rawValue
     @State private var showThemeMenu = false
 
-    @State private var profileName: String = "Sidhartha Javvadi"
-    @State private var profileNickname: String = "SID"
-    @State private var profileEmail: String = "javvadisidhartha9100@gmail.com"
+    @State private var profileName: String = ""
+    @State private var profileEmail: String = ""
     @State private var profilePhone: String = ""
-    @State private var recentNotifications: [AppNotificationItem] = [
-        .init(title: "Reminder sent", message: "Your reminder was sent successfully.", timeText: "Today"),
-        .init(title: "Expense added", message: "Your latest expense was saved to the activity page.", timeText: "Yesterday"),
-        .init(title: "Monthly limit", message: "You have used a good portion of your monthly budget.", timeText: "2d ago")
-    ]
+    @State private var recentNotifications: [AppNotificationItem] = []
 
     @State private var selectedFriendDetail: BalanceItem?
     @State private var selectedExpenseTarget: BalanceItem?
     @State private var selectedSettleTarget: BalanceItem?
 
-    @State private var friendsData: [BalanceItem] = [
-        .init(kind: .friend, name: "Friend -1", amount: 25, direction: .youOwe, participantCount: 2),
-        .init(kind: .friend, name: "Friend -2", amount: 12, direction: .owesYou, participantCount: 2),
-        .init(kind: .friend, name: "Friend -3", amount: 45, direction: .youOwe, participantCount: 2),
-        .init(kind: .friend, name: "Friend -4", amount: 30, direction: .owesYou, participantCount: 2),
-        .init(kind: .friend, name: "Friend -5", amount: 50, direction: .youOwe, participantCount: 2)
-    ]
-
-    @State private var groupsData: [BalanceItem] = [
-        .init(kind: .group, name: "Group -1", amount: 12, direction: .owesYou, participantCount: 3, memberNames: ["Friend -1", "Friend -2"]),
-        .init(kind: .group, name: "Group -2", amount: 45, direction: .youOwe, participantCount: 4, memberNames: ["Friend -2", "Friend -3", "Friend -4"]),
-        .init(kind: .group, name: "Group -3", amount: 30, direction: .owesYou, participantCount: 5, memberNames: ["Friend -1", "Friend -3", "Friend -4", "Friend -5"]),
-        .init(kind: .group, name: "Group -4", amount: 50, direction: .youOwe, participantCount: 3, memberNames: ["Friend -2", "Friend -5"]),
-        .init(kind: .group, name: "Group -5", amount: 25, direction: .youOwe, participantCount: 4, memberNames: ["Friend -1", "Friend -4", "Friend -5"])
-    ]
-
-    @State private var activityTransactions: [TransactionItem] = [
-        .init(title: "Trip to NYC", subtitle: "You paid · 3 people", amount: 4000.00, date: "Mar 16", monthKey: "2026-03", category: "Travel"),
-        .init(title: "Walmart", subtitle: "You paid · 3 people", amount: 120.00, date: "Mar 12", monthKey: "2026-03", category: "Shopping"),
-        .init(title: "Groceries", subtitle: "Taylor paid · 3 people", amount: 67.30, date: "Mar 11", monthKey: "2026-03", category: "Food"),
-        .init(title: "Dinner at Olive Garden", subtitle: "You paid · 4 people", amount: 86.50, date: "Mar 9", monthKey: "2026-03", category: "Food"),
-        .init(title: "Uber to Airport", subtitle: "Alex paid · 4 people", amount: 45.00, date: "Mar 8", monthKey: "2026-03", category: "Transport"),
-        .init(title: "March Rent", subtitle: "You paid · 3 people", amount: 2400.00, date: "Feb 28", monthKey: "2026-02", category: "Other")
-    ]
+    @State private var friendsData: [BalanceItem] = []
+    @State private var groupsData: [BalanceItem] = []
+    @State private var activityTransactions: [TransactionItem] = []
 
     var body: some View {
         ZStack(alignment: .leading) {
-            if isLoggedIn {
+            if isCheckingSession {
+                loadingView
+            } else if isLoggedIn {
                 mainAppView
             } else {
-                LoginPageView(
-                    onLogin: {
-                        isLoggedIn = true
-                    },
-                    onSignUp: { name, nickname, email, phone in
-                        profileName = name
-                        profileNickname = nickname.isEmpty ? "SID" : nickname
-                        profileEmail = email
-                        profilePhone = phone
-                        isLoggedIn = true
-
-                        recentNotifications.insert(
-                            .init(
-                                title: "Account created",
-                                message: "Welcome to SplitEasy, \(nickname.isEmpty ? name : nickname).",
-                                timeText: "Now"
-                            ),
-                            at: 0
-                        )
-                    }
-                )
+                LoginPageView {
+                    handleSuccessfulAuth()
+                }
             }
         }
         .preferredColorScheme(resolvedColorScheme)
+        .onAppear {
+            checkExistingSession()
+        }
+    }
+
+    private var loadingView: some View {
+        ZStack {
+            LinearGradient(
+                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            ProgressView("Loading...")
+                .foregroundColor(AppPalette.primaryText)
+                .tint(AppPalette.accentMid)
+        }
     }
 
     private var mainAppView: some View {
@@ -144,6 +121,10 @@ struct ContentView: View {
                             showFriendDetailPage = false
                             showSettleUpPage = true
                             settleUpReturnToFriendDetail = true
+                        },
+                        onRefresh: {
+                            loadFriendHistory(friendId: friend.id)
+                            loadFriendsFromFirestore()
                         }
                     )
                 } else if showAddFriendPage {
@@ -227,7 +208,6 @@ struct ContentView: View {
                         AccountPageView(
                             showThemeMenu: $showThemeMenu,
                             profileName: $profileName,
-                            profileNickname: $profileNickname,
                             profileEmail: $profileEmail,
                             profilePhone: $profilePhone,
                             notifications: recentNotifications,
@@ -256,6 +236,7 @@ struct ContentView: View {
                         },
                         set: { newValue in
                             savedThemeMode = newValue.rawValue
+                            FirebaseService.shared.updateThemeMode(newValue.rawValue) { _ in }
                         }
                     )
                 )
@@ -281,7 +262,7 @@ struct ContentView: View {
                 .padding(.bottom, -145)
             }
         }
-        .onChange(of: selectedTab) {
+        .onChange(of: selectedTab) { _, _ in
             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                 showPlusMenu = false
             }
@@ -312,6 +293,230 @@ struct ContentView: View {
         case .auto:
             let hour = Calendar.current.component(.hour, from: Date())
             return (hour >= 6 && hour < 18) ? .light : .dark
+        }
+    }
+
+    private func checkExistingSession() {
+        if FirebaseService.shared.currentUserId != nil {
+            handleSuccessfulAuth()
+        } else {
+            isLoggedIn = false
+            isCheckingSession = false
+        }
+    }
+
+    private func handleSuccessfulAuth() {
+        FirebaseService.shared.fetchCurrentUserProfile { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let profile):
+                    profileName = profile.nickname.isEmpty ? profile.fullName : profile.nickname
+                    profileEmail = profile.email.isEmpty ? (FirebaseService.shared.currentUserEmail ?? "") : profile.email
+                    profilePhone = profile.phone
+                    monthlyLimit = profile.monthlyLimit
+                    savedThemeMode = profile.themeMode
+                    isLoggedIn = true
+                    isCheckingSession = false
+
+                    loadFriendsFromFirestore()
+                    loadGroupsFromFirestore()
+                    loadActivityFromFirestore()
+                    loadNotificationsFromFirestore()
+
+                case .failure:
+                    profileName = ""
+                    profileEmail = FirebaseService.shared.currentUserEmail ?? ""
+                    profilePhone = ""
+                    monthlyLimit = 0
+                    savedThemeMode = AppThemeMode.auto.rawValue
+                    isLoggedIn = true
+                    isCheckingSession = false
+
+                    loadFriendsFromFirestore()
+                    loadGroupsFromFirestore()
+                    loadActivityFromFirestore()
+                    loadNotificationsFromFirestore()
+                }
+            }
+        }
+    }
+
+    private func loadFriendsFromFirestore() {
+        FirebaseService.shared.fetchFriends { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let records):
+                    friendsData = records.map { record in
+                        BalanceItem(
+                            id: record.documentId,
+                            kind: .friend,
+                            name: record.friendName,
+                            amount: record.balanceAmount,
+                            direction: record.balanceDirection == "youOwe" ? .youOwe : .owesYou,
+                            participantCount: 2,
+                            expenses: record.friendContact.isEmpty ? [] : [
+                                ExpenseEntry(
+                                    id: "contact-\(record.documentId)",
+                                    description: record.friendContact,
+                                    amount: 0,
+                                    dateText: "Contact"
+                                )
+                            ]
+                        )
+                    }
+
+                    if let selectedFriendDetail {
+                        self.selectedFriendDetail = friendsData.first(where: { $0.id == selectedFriendDetail.id })
+                    }
+
+                    if let selectedSettleTarget {
+                        self.selectedSettleTarget = friendsData.first(where: { $0.id == selectedSettleTarget.id })
+                    }
+
+                case .failure:
+                    friendsData = []
+                }
+            }
+        }
+    }
+
+    private func loadGroupsFromFirestore() {
+        FirebaseService.shared.fetchGroups { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let records):
+                    groupsData = records.map { record in
+                        BalanceItem(
+                            id: record.documentId,
+                            kind: .group,
+                            name: record.name,
+                            amount: record.balanceAmount,
+                            direction: record.balanceDirection == "youOwe" ? .youOwe : .owesYou,
+                            participantCount: max(record.participantCount, 1),
+                            memberNames: record.memberNames,
+                            expenses: []
+                        )
+                    }
+
+                    if let selectedExpenseTarget, selectedExpenseTarget.kind == .group {
+                        self.selectedExpenseTarget = groupsData.first(where: { $0.id == selectedExpenseTarget.id })
+                    }
+
+                case .failure:
+                    groupsData = []
+                }
+            }
+        }
+    }
+
+    private func loadActivityFromFirestore() {
+        FirebaseService.shared.fetchActivity { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let records):
+                    activityTransactions = records.map {
+                        TransactionItem(
+                            id: $0.documentId,
+                            title: $0.title,
+                            subtitle: $0.subtitle,
+                            amount: $0.amount,
+                            date: $0.date,
+                            monthKey: $0.monthKey,
+                            category: $0.category
+                        )
+                    }
+
+                case .failure:
+                    activityTransactions = []
+                }
+            }
+        }
+    }
+
+    private func loadNotificationsFromFirestore() {
+        FirebaseService.shared.fetchNotifications { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let records):
+                    recentNotifications = records.map {
+                        AppNotificationItem(
+                            id: $0.documentId,
+                            title: $0.title,
+                            message: $0.message,
+                            timeText: $0.timeText
+                        )
+                    }
+
+                case .failure:
+                    recentNotifications = []
+                }
+            }
+        }
+    }
+
+    private func loadFriendHistory(friendId: String) {
+        FirebaseService.shared.fetchExpenseHistory(
+            targetType: "friend",
+            targetDocumentId: friendId
+        ) { result in
+            DispatchQueue.main.async {
+                guard let index = friendsData.firstIndex(where: { $0.id == friendId }) else { return }
+
+                switch result {
+                case .success(let records):
+                    let preservedContactExpense = friendsData[index].expenses.filter { $0.dateText == "Contact" }
+
+                    let historyExpenses = records.map {
+                        ExpenseEntry(
+                            id: $0.documentId,
+                            description: $0.description,
+                            amount: $0.amount,
+                            dateText: $0.dateText,
+                            receiptURL: $0.receiptURL
+                        )
+                    }
+
+                    friendsData[index].expenses = historyExpenses + preservedContactExpense
+
+                    if selectedFriendDetail?.id == friendId {
+                        selectedFriendDetail = friendsData[index]
+                    }
+
+                case .failure:
+                    break
+                }
+            }
+        }
+    }
+
+    private func loadGroupHistory(groupId: String) {
+        FirebaseService.shared.fetchExpenseHistory(
+            targetType: "group",
+            targetDocumentId: groupId
+        ) { result in
+            DispatchQueue.main.async {
+                guard let index = groupsData.firstIndex(where: { $0.id == groupId }) else { return }
+
+                switch result {
+                case .success(let records):
+                    groupsData[index].expenses = records.map {
+                        ExpenseEntry(
+                            id: $0.documentId,
+                            description: $0.description,
+                            amount: $0.amount,
+                            dateText: $0.dateText,
+                            receiptURL: $0.receiptURL
+                        )
+                    }
+
+                    if selectedExpenseTarget?.id == groupId {
+                        selectedExpenseTarget = groupsData[index]
+                    }
+
+                case .failure:
+                    break
+                }
+            }
         }
     }
 
@@ -377,6 +582,7 @@ struct ContentView: View {
 
     private func openFriendDetailPage(for item: BalanceItem) {
         selectedFriendDetail = item
+        loadFriendHistory(friendId: item.id)
         showFriendDetailPage = true
         showSettleUpSelectionPage = false
         showSettleUpPage = false
@@ -386,6 +592,13 @@ struct ContentView: View {
 
     private func openExpensePage(for item: BalanceItem) {
         selectedExpenseTarget = item
+
+        if item.kind == .group {
+            loadGroupHistory(groupId: item.id)
+        } else {
+            loadFriendHistory(friendId: item.id)
+        }
+
         showExpenseSelectionPage = false
         showFriendDetailPage = false
         showSettleUpSelectionPage = false
@@ -410,204 +623,225 @@ struct ContentView: View {
     }
 
     private func saveNewFriend(name: String, contact: String) {
-        let newFriend = BalanceItem(
-            kind: .friend,
-            name: name,
-            amount: 0,
-            direction: .owesYou,
-            participantCount: 2,
-            expenses: contact.isEmpty ? [] : [
-                ExpenseEntry(description: contact, amount: 0, dateText: "Contact")
-            ]
-        )
-        friendsData.insert(newFriend, at: 0)
-        selectedSection = .friends
-        showAddFriendPage = false
-        selectedTab = .friends
+        FirebaseService.shared.addFriend(friendName: name, friendContact: contact) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    loadFriendsFromFirestore()
+                    selectedSection = .friends
+                    showAddFriendPage = false
+                    selectedTab = .friends
 
-        recentNotifications.insert(
-            .init(title: "Friend added", message: "\(name) was added successfully.", timeText: "Now"),
-            at: 0
-        )
-    }
+                    FirebaseService.shared.saveNotification(
+                        title: "Friend added",
+                        message: "\(name) was added successfully."
+                    ) { _ in
+                        loadNotificationsFromFirestore()
+                    }
 
-    private func saveNewGroup(name: String, type: GroupType, members: [BalanceItem]) {
-        let newGroup = BalanceItem(
-            kind: .group,
-            name: name,
-            amount: 0,
-            direction: .owesYou,
-            participantCount: members.count + 1,
-            memberNames: members.map { $0.name },
-            expenses: []
-        )
-        groupsData.insert(newGroup, at: 0)
-        selectedSection = .groups
-        showCreateGroupPage = false
-        selectedTab = .friends
-
-        recentNotifications.insert(
-            .init(title: "Group created", message: "\(name) was created successfully.", timeText: "Now"),
-            at: 0
-        )
-    }
-
-    private func signedBalance(for item: BalanceItem) -> Double {
-        item.direction == .owesYou ? item.amount : -item.amount
-    }
-
-    private func applyNetAmount(_ net: Double, to item: inout BalanceItem) {
-        let updated = signedBalance(for: item) + net
-        item.amount = abs(updated)
-        item.direction = updated >= 0 ? .owesYou : .youOwe
-    }
-
-    private func settleUpFriend(itemID: UUID, amount: Double, method: String) {
-        guard let index = friendsData.firstIndex(where: { $0.id == itemID }) else { return }
-
-        let currentSigned = signedBalance(for: friendsData[index])
-        let updatedSigned = currentSigned > 0 ? currentSigned - amount : currentSigned + amount
-
-        friendsData[index].amount = abs(updatedSigned)
-        friendsData[index].direction = updatedSigned >= 0 ? .owesYou : .youOwe
-        friendsData[index].expenses.insert(
-            ExpenseEntry(
-                description: "Settle up via \(method)",
-                amount: amount,
-                dateText: currentDayText()
-            ),
-            at: 0
-        )
-
-        selectedSettleTarget = friendsData[index]
-        selectedFriendDetail = friendsData[index]
-
-        activityTransactions.insert(
-            TransactionItem(
-                title: "Settle up with \(friendsData[index].name)",
-                subtitle: method,
-                amount: amount,
-                date: currentDayText(),
-                monthKey: monthKey(for: Date()),
-                category: "Other"
-            ),
-            at: 0
-        )
-
-        recentNotifications.insert(
-            .init(title: "Settlement saved", message: "You settled \(friendsData[index].name) via \(method).", timeText: "Now"),
-            at: 0
-        )
-
-        if settleUpReturnToFriendDetail {
-            showSettleUpPage = false
-            showFriendDetailPage = true
-            selectedTab = .friends
-        } else {
-            showSettleUpPage = false
-            showSettleUpSelectionPage = false
-            selectedTab = .home
+                case .failure:
+                    break
+                }
+            }
         }
     }
 
-    private func currentDayText() -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: Date())
+    private func saveNewGroup(name: String, type: GroupType, members: [BalanceItem]) {
+        FirebaseService.shared.createGroup(
+            name: name,
+            type: type.firestoreValue,
+            memberNames: members.map(\.name)
+        ) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    loadGroupsFromFirestore()
+                    selectedSection = .groups
+                    showCreateGroupPage = false
+                    selectedTab = .friends
+
+                    FirebaseService.shared.saveNotification(
+                        title: "Group created",
+                        message: "\(name) was created successfully."
+                    ) { _ in
+                        loadNotificationsFromFirestore()
+                    }
+
+                case .failure:
+                    break
+                }
+            }
+        }
+    }
+
+    private func settleUpFriend(itemID: String, amount: Double, method: String) {
+        guard let index = friendsData.firstIndex(where: { $0.id == itemID }) else { return }
+
+        let friendName = friendsData[index].name
+
+        FirebaseService.shared.saveSettlement(
+            friendDocumentId: itemID,
+            friendName: friendName,
+            amount: amount,
+            method: method
+        ) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    loadFriendsFromFirestore()
+                    loadActivityFromFirestore()
+                    loadFriendHistory(friendId: itemID)
+
+                    FirebaseService.shared.saveNotification(
+                        title: "Settlement saved",
+                        message: "You settled \(friendName) via \(method)."
+                    ) { _ in
+                        loadNotificationsFromFirestore()
+                    }
+
+                    if settleUpReturnToFriendDetail {
+                        showSettleUpPage = false
+                        showFriendDetailPage = true
+                        selectedTab = .friends
+                    } else {
+                        showSettleUpPage = false
+                        showSettleUpSelectionPage = false
+                        selectedTab = .home
+                    }
+
+                case .failure:
+                    break
+                }
+            }
+        }
     }
 
     private func saveExpense(
-        itemID: UUID,
+        itemID: String,
         description: String,
         amount: Double,
         direction: BalanceDirection,
-        groupDraft: GroupExpenseDraft?
+        groupDraft: GroupExpenseDraft?,
+        receiptURL: String?
     ) {
         let now = Date()
+
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "MMM d"
+        let dayText = dayFormatter.string(from: now)
 
         let monthFormatter = DateFormatter()
         monthFormatter.dateFormat = "yyyy-MM"
+        let monthKey = monthFormatter.string(from: now)
+
+        let category = inferCategory(from: description)
 
         if let friendIndex = friendsData.firstIndex(where: { $0.id == itemID }) {
             let friend = friendsData[friendIndex]
-            let newExpense = ExpenseEntry(
+
+            let subtitle = direction == .owesYou
+                ? "You paid · \(friend.name)"
+                : "\(friend.name) paid"
+
+            let payload = FirestoreExpensePayload(
+                targetType: "friend",
+                targetDocumentId: itemID,
                 description: description,
                 amount: amount,
-                dateText: dayFormatter.string(from: now)
+                direction: direction,
+                category: category,
+                dateText: dayText,
+                monthKey: monthKey,
+                activitySubtitle: subtitle,
+                groupDraft: nil,
+                receiptURL: receiptURL
             )
 
-            let net = direction == .owesYou ? amount : -amount
-            applyNetAmount(net, to: &friendsData[friendIndex])
-            friendsData[friendIndex].expenses.insert(newExpense, at: 0)
-            selectedExpenseTarget = friendsData[friendIndex]
-            selectedFriendDetail = friendsData[friendIndex]
+            FirebaseService.shared.saveExpense(payload: payload) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        loadFriendsFromFirestore()
+                        loadActivityFromFirestore()
+                        loadFriendHistory(friendId: itemID)
 
-            let transaction = TransactionItem(
-                title: description,
-                subtitle: direction == .owesYou ? "You paid · \(friend.name)" : "\(friend.name) paid",
-                amount: amount,
-                date: dayFormatter.string(from: now),
-                monthKey: monthFormatter.string(from: now),
-                category: inferCategory(from: description)
-            )
-            activityTransactions.insert(transaction, at: 0)
+                        FirebaseService.shared.saveNotification(
+                            title: "Expense added",
+                            message: "\(description) was added for \(friend.name)."
+                        ) { _ in
+                            loadNotificationsFromFirestore()
+                        }
 
-            recentNotifications.insert(
-                .init(title: "Expense added", message: "\(description) was added for \(friend.name).", timeText: "Now"),
-                at: 0
-            )
+                        if let updatedFriend = friendsData.first(where: { $0.id == itemID }) {
+                            selectedFriendDetail = updatedFriend
+                        }
+                        showFriendDetailPage = true
+                        selectedTab = .friends
+                        selectedSection = .friends
 
-            showFriendDetailPage = true
-            selectedTab = .friends
-            selectedSection = .friends
+                    case .failure:
+                        break
+                    }
+                }
+            }
+
             return
         }
 
         if let groupIndex = groupsData.firstIndex(where: { $0.id == itemID }) {
-            let newExpense = ExpenseEntry(
-                description: description,
-                amount: amount,
-                dateText: dayFormatter.string(from: now)
-            )
+            let group = groupsData[groupIndex]
 
-            let net = groupDraft?.yourNetAmount ?? (direction == .owesYou ? amount : -amount)
-            applyNetAmount(net, to: &groupsData[groupIndex])
-            groupsData[groupIndex].expenses.insert(newExpense, at: 0)
-            selectedExpenseTarget = groupsData[groupIndex]
-
-            let subtitleText: String
+            let subtitle: String
             if let groupDraft {
                 let payerDetails = groupDraft.paidBy.map { person in
                     let paid = groupDraft.paidAmounts[person] ?? 0
                     return "\(person) $\(String(format: "%.2f", paid))"
                 }.joined(separator: ", ")
 
-                subtitleText = "Paid by \(payerDetails) · split with \(groupDraft.splitWith.count)"
+                subtitle = "Paid by \(payerDetails) · split with \(groupDraft.splitWith.count)"
             } else {
-                subtitleText = direction == .owesYou
-                    ? "You paid · \(groupsData[groupIndex].participantCount) people"
-                    : "\(groupsData[groupIndex].participantCount) people paid"
+                subtitle = direction == .owesYou
+                    ? "You paid · \(group.participantCount) people"
+                    : "\(group.participantCount) people paid"
             }
 
-            let transaction = TransactionItem(
-                title: description,
-                subtitle: subtitleText,
+            let payload = FirestoreExpensePayload(
+                targetType: "group",
+                targetDocumentId: itemID,
+                description: description,
                 amount: amount,
-                date: dayFormatter.string(from: now),
-                monthKey: monthFormatter.string(from: now),
-                category: inferCategory(from: description)
-            )
-            activityTransactions.insert(transaction, at: 0)
-
-            recentNotifications.insert(
-                .init(title: "Group expense added", message: "\(description) was added to \(groupsData[groupIndex].name).", timeText: "Now"),
-                at: 0
+                direction: direction,
+                category: category,
+                dateText: dayText,
+                monthKey: monthKey,
+                activitySubtitle: subtitle,
+                groupDraft: groupDraft,
+                receiptURL: receiptURL
             )
 
-            selectedSection = .groups
-            selectedTab = .friends
+            FirebaseService.shared.saveExpense(payload: payload) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        loadGroupsFromFirestore()
+                        loadActivityFromFirestore()
+                        loadGroupHistory(groupId: itemID)
+
+                        FirebaseService.shared.saveNotification(
+                            title: "Group expense added",
+                            message: "\(description) was added to \(group.name)."
+                        ) { _ in
+                            loadNotificationsFromFirestore()
+                        }
+
+                        selectedSection = .groups
+                        selectedTab = .friends
+
+                    case .failure:
+                        break
+                    }
+                }
+            }
         }
     }
 
@@ -653,45 +887,60 @@ struct ContentView: View {
         }
     }
 
-    private func saveProfile(name: String, nickname: String, email: String, phone: String, password: String) {
-        profileName = name.isEmpty ? profileName : name
-        profileNickname = nickname.isEmpty ? profileNickname : nickname
-        profileEmail = email.isEmpty ? profileEmail : email
+    private func saveProfile(name: String, email: String, phone: String, password: String) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedEmail = email.isEmpty ? profileEmail : email
+
+        profileName = trimmedName
+        profileEmail = resolvedEmail
         profilePhone = phone
 
-        recentNotifications.insert(
-            .init(
-                title: "Profile updated",
-                message: password.isEmpty ? "Your profile details were updated." : "Your profile and password were updated.",
-                timeText: "Now"
-            ),
-            at: 0
-        )
+        FirebaseService.shared.updateCurrentUserProfile(
+            fullName: "",
+            nickname: trimmedName,
+            email: resolvedEmail,
+            phone: phone,
+            monthlyLimit: monthlyLimit,
+            selectedAvatarIndex: 0
+        ) { _ in }
+
+        FirebaseService.shared.saveNotification(
+            title: "Profile updated",
+            message: password.isEmpty ? "Your profile details were updated." : "Your profile was updated."
+        ) { _ in
+            loadNotificationsFromFirestore()
+        }
     }
 
     private func submitFeedback(rating: Int, message: String) {
-        recentNotifications.insert(
-            .init(
-                title: "Feedback received",
-                message: rating > 0 ? "Thanks for rating the app \(rating)/5." : "Thanks for your feedback.",
-                timeText: "Now"
-            ),
-            at: 0
-        )
+        FirebaseService.shared.saveFeedback(rating: rating, message: message) { _ in }
+
+        FirebaseService.shared.saveNotification(
+            title: "Feedback received",
+            message: rating > 0 ? "Thanks for rating the app \(rating)/5." : "Thanks for your feedback."
+        ) { _ in
+            loadNotificationsFromFirestore()
+        }
     }
 
     private func contactSupport(subject: String, message: String) {
-        recentNotifications.insert(
-            .init(
-                title: "Support message sent",
-                message: subject.isEmpty ? "Your message was sent to customer service." : "\"\(subject)\" was sent to customer service.",
-                timeText: "Now"
-            ),
-            at: 0
-        )
+        FirebaseService.shared.saveSupportMessage(subject: subject, message: message) { _ in }
+
+        FirebaseService.shared.saveNotification(
+            title: "Support message sent",
+            message: subject.isEmpty ? "Your message was sent to customer service." : "\"\(subject)\" was sent to customer service."
+        ) { _ in
+            loadNotificationsFromFirestore()
+        }
     }
 
     private func signOut() {
+        do {
+            try FirebaseService.shared.signOut()
+        } catch {
+            return
+        }
+
         showThemeMenu = false
         showPlusMenu = false
         showExpenseSelectionPage = false
@@ -701,6 +950,21 @@ struct ContentView: View {
         showSettleUpSelectionPage = false
         showSettleUpPage = false
         selectedTab = .home
+        selectedSection = .friends
+
+        profileName = ""
+        profileEmail = ""
+        profilePhone = ""
+        monthlyLimit = 0
+        savedThemeMode = AppThemeMode.auto.rawValue
+        recentNotifications = []
+        friendsData = []
+        groupsData = []
+        activityTransactions = []
+        selectedFriendDetail = nil
+        selectedExpenseTarget = nil
+        selectedSettleTarget = nil
+
         isLoggedIn = false
     }
 }

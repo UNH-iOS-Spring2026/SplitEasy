@@ -13,8 +13,29 @@ struct FriendDetailPageView: View {
     @Binding var showFriendDetailPage: Bool
     let onAddExpense: (BalanceItem) -> Void
     let onSettleUp: (BalanceItem) -> Void
+    let onRefresh: (() -> Void)?
+
+    @State private var isImagePreviewPresented = false
+    @State private var previewReceiptURL: String = ""
+    @State private var isRefreshing = false
 
     private let themePurple = AppPalette.accentMid
+
+    init(
+        friend: BalanceItem,
+        selectedTab: Binding<Tab>,
+        showFriendDetailPage: Binding<Bool>,
+        onAddExpense: @escaping (BalanceItem) -> Void,
+        onSettleUp: @escaping (BalanceItem) -> Void,
+        onRefresh: (() -> Void)? = nil
+    ) {
+        self.friend = friend
+        self._selectedTab = selectedTab
+        self._showFriendDetailPage = showFriendDetailPage
+        self.onAddExpense = onAddExpense
+        self.onSettleUp = onSettleUp
+        self.onRefresh = onRefresh
+    }
 
     var body: some View {
         ZStack {
@@ -40,7 +61,10 @@ struct FriendDetailPageView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 20)
-                    .padding(.bottom, 30)
+                    .padding(.bottom, 110)
+                }
+                .refreshable {
+                    await refreshData()
                 }
             }
 
@@ -51,6 +75,9 @@ struct FriendDetailPageView: View {
                     .padding(.horizontal, 20)
                     .padding(.bottom, 28)
             }
+        }
+        .sheet(isPresented: $isImagePreviewPresented) {
+            receiptPreviewSheet
         }
     }
 
@@ -85,7 +112,30 @@ struct FriendDetailPageView: View {
 
             Spacer()
 
-            Color.clear.frame(width: 46, height: 46)
+            Button {
+                Task {
+                    await refreshData()
+                }
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(AppPalette.card)
+                        .frame(width: 46, height: 46)
+                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+
+                    if isRefreshing {
+                        ProgressView()
+                            .tint(AppPalette.accentMid)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(AppPalette.accentMid)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            .disabled(isRefreshing)
+            .padding(.top, -65)
         }
     }
 
@@ -119,15 +169,7 @@ struct FriendDetailPageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground)
     }
 
     private var actionCards: some View {
@@ -140,9 +182,11 @@ struct FriendDetailPageView: View {
             .buttonStyle(.plain)
 
             Button {
-                print("Remind tapped")
+                Task {
+                    await refreshData()
+                }
             } label: {
-                actionCardContent(icon: "bell", title: "Remind")
+                actionCardContent(icon: "arrow.clockwise", title: "Refresh")
             }
             .buttonStyle(.plain)
         }
@@ -160,25 +204,33 @@ struct FriendDetailPageView: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: 100)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var recentExpensesSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Recent Expenses")
-                .font(.system(size: 22, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
+            HStack {
+                Text("Recent Expenses")
+                    .font(.system(size: 22, weight: .bold))
+                    .italic()
+                    .foregroundColor(AppPalette.primaryText)
 
-            if friend.expenses.isEmpty {
+                Spacer()
+
+                if !visibleExpenses.isEmpty {
+                    Text("\(visibleExpenses.count)")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            Capsule()
+                                .fill(AppPalette.accentMid)
+                        )
+                }
+            }
+
+            if visibleExpenses.isEmpty {
                 VStack(spacing: 10) {
                     Image(systemName: "tray")
                         .font(.system(size: 26, weight: .semibold))
@@ -187,67 +239,170 @@ struct FriendDetailPageView: View {
                     Text("No expenses yet")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(AppPalette.secondaryText)
+
+                    Text("Add an expense and it will appear here even after relaunch.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(AppPalette.secondaryText)
+                        .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(AppPalette.card)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22)
-                                .stroke(AppPalette.border, lineWidth: 1)
-                        )
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
-                )
+                .background(cardBackground(cornerRadius: 22))
             } else {
-                VStack(spacing: 0) {
-                    ForEach(friend.expenses) { expense in
-                        HStack(spacing: 12) {
-                            Circle()
-                                .fill(themePurple.opacity(0.12))
-                                .frame(width: 44, height: 44)
-                                .overlay(
-                                    Image(systemName: "receipt")
-                                        .font(.system(size: 18, weight: .semibold))
-                                        .foregroundColor(themePurple)
-                                )
+                VStack(spacing: 14) {
+                    ForEach(visibleExpenses) { expense in
+                        expenseCard(expense)
+                    }
+                }
+            }
+        }
+    }
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(expense.description)
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(AppPalette.primaryText)
+    private func expenseCard(_ expense: ExpenseEntry) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 12) {
+                Circle()
+                    .fill(themePurple.opacity(0.12))
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: expense.receiptURL.isEmpty ? "receipt" : "photo.on.rectangle")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundColor(themePurple)
+                    )
 
-                                Text(expense.dateText)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(expense.description)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(AppPalette.primaryText)
+
+                    Text(expense.dateText)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppPalette.secondaryText)
+                }
+
+                Spacer()
+
+                Text("$\(String(format: "%.2f", expense.amount))")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 14)
+            .padding(.bottom, expense.receiptURL.isEmpty ? 14 : 10)
+
+            if !expense.receiptURL.isEmpty,
+               let url = URL(string: expense.receiptURL) {
+                Button {
+                    previewReceiptURL = expense.receiptURL
+                    isImagePreviewPresented = true
+                } label: {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(AppPalette.searchField)
+                                ProgressView()
+                            }
+                            .frame(height: 170)
+
+                        case .success(let image):
+                            ZStack(alignment: .topTrailing) {
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(height: 170)
+                                    .frame(maxWidth: .infinity)
+                                    .clipped()
+                                    .cornerRadius(16)
+
+                                Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(10)
+                                    .background(
+                                        Circle()
+                                            .fill(Color.black.opacity(0.45))
+                                    )
+                                    .padding(10)
+                            }
+
+                        case .failure:
+                            VStack(spacing: 8) {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 22, weight: .semibold))
+                                    .foregroundColor(AppPalette.secondaryText)
+
+                                Text("Unable to load receipt")
                                     .font(.system(size: 13, weight: .semibold))
                                     .foregroundColor(AppPalette.secondaryText)
                             }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 120)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(AppPalette.searchField)
+                            )
 
-                            Spacer()
-
-                            Text("$\(String(format: "%.2f", expense.amount))")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(AppPalette.primaryText)
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-
-                        if expense.id != friend.expenses.last?.id {
-                            Divider()
-                                .padding(.leading, 72)
+                        @unknown default:
+                            EmptyView()
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 14)
                 }
-                .background(
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(AppPalette.card)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 22)
-                                .stroke(AppPalette.border, lineWidth: 1)
-                        )
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
-                )
+                .buttonStyle(.plain)
             }
         }
+        .background(cardBackground(cornerRadius: 22))
+    }
+
+    private var receiptPreviewSheet: some View {
+        NavigationStack {
+            ZStack {
+                LinearGradient(
+                    colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+
+                if let url = URL(string: previewReceiptURL), !previewReceiptURL.isEmpty {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .tint(AppPalette.accentMid)
+
+                        case .success(let image):
+                            ZoomableReceiptImage(image: image)
+
+                        case .failure:
+                            VStack(spacing: 10) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.system(size: 24, weight: .bold))
+                                    .foregroundColor(.orange)
+
+                                Text("Unable to load receipt")
+                                    .font(.system(size: 16, weight: .bold))
+                                    .foregroundColor(AppPalette.primaryText)
+                            }
+
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
+                    .padding()
+                }
+            }
+            .navigationTitle("Receipt")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.large])
+    }
+
+    private var visibleExpenses: [ExpenseEntry] {
+        friend.expenses.filter { $0.dateText != "Contact" }
     }
 
     private var addExpenseButton: some View {
@@ -269,5 +424,48 @@ struct FriendDetailPageView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+
+    private func cardBackground(cornerRadius: CGFloat = 24) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(AppPalette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(AppPalette.border, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
+    }
+
+    private var cardBackground: some View {
+        cardBackground(cornerRadius: 24)
+    }
+
+    @MainActor
+    private func refreshData() async {
+        guard let onRefresh else { return }
+        isRefreshing = true
+        onRefresh()
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        isRefreshing = false
+    }
+}
+
+struct ZoomableReceiptImage<Content: View>: View {
+    let image: Content
+    @State private var scale: CGFloat = 1
+
+    var body: some View {
+        ScrollView([.horizontal, .vertical], showsIndicators: false) {
+            image
+                .scaledToFit()
+                .scaleEffect(scale)
+                .animation(.easeInOut(duration: 0.2), value: scale)
+                .onTapGesture(count: 2) {
+                    withAnimation {
+                        scale = scale > 1 ? 1 : 2
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 }

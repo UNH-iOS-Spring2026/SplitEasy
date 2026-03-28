@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AddExpensePageView: View {
     let selectedItem: BalanceItem?
-    let onSaveExpense: (UUID, String, Double, BalanceDirection, GroupExpenseDraft?) -> Void
+    let onSaveExpense: (String, String, Double, BalanceDirection, GroupExpenseDraft?, String?) -> Void
     @Binding var selectedTab: Tab
 
     @State private var withName: String = ""
@@ -19,6 +19,11 @@ struct AddExpensePageView: View {
     @State private var showSplitPicker = false
 
     @State private var paidAmountsText: [String: String] = [:]
+
+    @State private var receiptImage: UIImage?
+    @State private var showReceiptPicker = false
+    @State private var receiptURL: String = ""
+    @State private var isUploadingReceipt = false
 
     var body: some View {
         ZStack {
@@ -88,6 +93,9 @@ struct AddExpensePageView: View {
                 selectedPeople: $selectedSplitPeople
             )
         }
+        .sheet(isPresented: $showReceiptPicker) {
+            ImagePicker(image: $receiptImage)
+        }
         .onAppear {
             withName = selectedItem?.name ?? ""
             if isGroup {
@@ -96,15 +104,20 @@ struct AddExpensePageView: View {
                 resetPaidAmountsForCurrentSelection()
             }
         }
-        .onChange(of: amountText) {
+        .onChange(of: amountText) { _, _ in
             if isGroup && !splitEquallySelected {
                 resetPaidAmountsForCurrentSelection()
             }
         }
-        .onChange(of: selectedPaidByPeople) {
+        .onChange(of: selectedPaidByPeople) { _, _ in
             if isGroup && !splitEquallySelected {
                 resetPaidAmountsForCurrentSelection()
             }
+        }
+        .onChange(of: selectedItem?.id) { _, _ in
+            receiptImage = nil
+            receiptURL = ""
+            isUploadingReceipt = false
         }
     }
 
@@ -153,27 +166,34 @@ struct AddExpensePageView: View {
             Button {
                 saveExpense()
             } label: {
-                Text("Save")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                AppPalette.accentStart,
-                                AppPalette.accentEnd
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
+                HStack(spacing: 8) {
+                    if isUploadingReceipt {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text("Save")
+                        .font(.system(size: 18, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [
+                            AppPalette.accentStart,
+                            AppPalette.accentEnd
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
-                    .clipShape(Capsule())
-                    .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-                    .opacity(canSaveExpense ? 1 : 0.65)
+                )
+                .clipShape(Capsule())
+                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
+                .opacity(canSaveExpense ? 1 : 0.65)
             }
             .buttonStyle(.plain)
-            .disabled(!canSaveExpense)
+            .disabled(!canSaveExpense || isUploadingReceipt)
             .padding(.top, -45)
         }
     }
@@ -210,13 +230,13 @@ struct AddExpensePageView: View {
                 .foregroundColor(AppPalette.secondaryText)
 
             Button {
-                print("Camera tapped")
+                showReceiptPicker = true
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: "camera.fill")
+                    Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark.circle.fill")
                         .font(.system(size: 16, weight: .bold))
 
-                    Text("Take a picture")
+                    Text(receiptImage == nil ? "Take a picture / choose image" : "Receipt selected")
                         .font(.system(size: 16, weight: .bold))
                 }
                 .foregroundColor(.white)
@@ -236,6 +256,16 @@ struct AddExpensePageView: View {
                 .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
             }
             .buttonStyle(.plain)
+
+            if let receiptImage {
+                Image(uiImage: receiptImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 150)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .cornerRadius(16)
+            }
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
@@ -298,6 +328,7 @@ struct AddExpensePageView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 TextField("Enter amount", text: $amountText)
+                    .keyboardType(.decimalPad)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(AppPalette.primaryText)
 
@@ -732,18 +763,61 @@ extension AddExpensePageView {
             paidAmounts: paidAmountsDictionary
         ) : nil
 
-        onSaveExpense(
-            selectedItem.id,
-            descriptionText,
-            calculatedAmount,
-            activeDirection,
-            draft
-        )
+        guard let image = receiptImage,
+              let data = image.jpegData(compressionQuality: 0.6) else {
+            onSaveExpense(
+                selectedItem.id,
+                descriptionText,
+                calculatedAmount,
+                activeDirection,
+                draft,
+                nil
+            )
+            resetAfterSave(for: selectedItem)
+            return
+        }
 
+        isUploadingReceipt = true
+        let expenseId = UUID().uuidString
+
+        FirebaseService.shared.uploadReceiptImage(expenseId: expenseId, data: data) { result in
+            DispatchQueue.main.async {
+                isUploadingReceipt = false
+
+                switch result {
+                case .success(let url):
+                    receiptURL = url
+                    onSaveExpense(
+                        selectedItem.id,
+                        descriptionText,
+                        calculatedAmount,
+                        activeDirection,
+                        draft,
+                        url
+                    )
+                case .failure:
+                    onSaveExpense(
+                        selectedItem.id,
+                        descriptionText,
+                        calculatedAmount,
+                        activeDirection,
+                        draft,
+                        nil
+                    )
+                }
+
+                resetAfterSave(for: selectedItem)
+            }
+        }
+    }
+
+    private func resetAfterSave(for item: BalanceItem) {
         descriptionText = ""
         amountText = ""
         paidAmountsText = [:]
-        selectedTab = selectedItem.kind == .group ? .friends : .home
+        receiptImage = nil
+        receiptURL = ""
+        selectedTab = item.kind == .group ? .friends : .home
     }
 }
 

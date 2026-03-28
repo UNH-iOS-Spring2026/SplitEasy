@@ -10,7 +10,7 @@ import SwiftUI
 struct SettleUpPageView: View {
     let friend: BalanceItem
     let onBack: () -> Void
-    let onSave: (UUID, Double, String) -> Void
+    let onSave: (String, Double, String) -> Void
 
     @State private var amountText: String = ""
     @State private var selectedMethod: String = ""
@@ -75,7 +75,6 @@ struct SettleUpPageView: View {
             }
             .buttonStyle(.plain)
             .padding(.top, -65)
-            
 
             Spacer()
 
@@ -250,6 +249,7 @@ struct SettleUpPageView: View {
         onSave(friend.id, enteredAmount, selectedMethod)
     }
 }
+
 #Preview {
     ContentView()
 }

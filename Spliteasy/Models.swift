@@ -66,10 +66,25 @@ enum ItemKind {
 }
 
 struct ExpenseEntry: Identifiable, Hashable {
-    let id = UUID()
+    let id: String
     let description: String
     let amount: Double
     let dateText: String
+    let receiptURL: String
+
+    init(
+        id: String = UUID().uuidString,
+        description: String,
+        amount: Double,
+        dateText: String,
+        receiptURL: String = ""
+    ) {
+        self.id = id
+        self.description = description
+        self.amount = amount
+        self.dateText = dateText
+        self.receiptURL = receiptURL
+    }
 }
 
 struct GroupExpenseDraft: Hashable {
@@ -80,7 +95,7 @@ struct GroupExpenseDraft: Hashable {
 }
 
 struct BalanceItem: Identifiable, Hashable {
-    let id: UUID
+    let id: String
     let kind: ItemKind
     var name: String
     var amount: Double
@@ -90,7 +105,7 @@ struct BalanceItem: Identifiable, Hashable {
     var expenses: [ExpenseEntry]
 
     init(
-        id: UUID = UUID(),
+        id: String,
         kind: ItemKind,
         name: String,
         amount: Double,
@@ -139,7 +154,7 @@ struct MonthlyExpense: Identifiable, Hashable {
 }
 
 struct TransactionItem: Identifiable, Hashable {
-    let id: UUID
+    let id: String
     let title: String
     let subtitle: String
     let amount: Double
@@ -148,7 +163,7 @@ struct TransactionItem: Identifiable, Hashable {
     let category: String
 
     init(
-        id: UUID = UUID(),
+        id: String = UUID().uuidString,
         title: String,
         subtitle: String,
         amount: Double,
@@ -163,5 +178,24 @@ struct TransactionItem: Identifiable, Hashable {
         self.date = date
         self.monthKey = monthKey
         self.category = category
+    }
+}
+
+struct AppNotificationItem: Identifiable, Hashable {
+    let id: String
+    let title: String
+    let message: String
+    let timeText: String
+
+    init(
+        id: String = UUID().uuidString,
+        title: String,
+        message: String,
+        timeText: String
+    ) {
+        self.id = id
+        self.title = title
+        self.message = message
+        self.timeText = timeText
     }
 }
