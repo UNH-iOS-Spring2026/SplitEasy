@@ -396,7 +396,9 @@ struct FriendDetailPageView: View {
                 }
             }
             .navigationTitle("Receipt")
+            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
+            #endif
         }
         .presentationDetents([.large])
     }
@@ -462,10 +464,21 @@ struct ZoomableReceiptImage<Content: View>: View {
                 .animation(.easeInOut(duration: 0.2), value: scale)
                 .onTapGesture(count: 2) {
                     withAnimation {
-                        scale = scale > 1 ? 1 : 2
+                        scale = scale == 1 ? 2 : 1
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .automatic) {
+                Button("Zoom In") {
+                    scale = min(scale + 0.5, 4)
+                }
+
+                Button("Zoom Out") {
+                    scale = max(scale - 0.5, 1)
+                }
+            }
         }
     }
 }

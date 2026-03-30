@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct AddExpensePageView: View {
     let selectedItem: BalanceItem?
@@ -20,7 +23,9 @@ struct AddExpensePageView: View {
 
     @State private var paidAmountsText: [String: String] = [:]
 
+    #if os(iOS)
     @State private var receiptImage: UIImage?
+    #endif
     @State private var showReceiptPicker = false
     @State private var receiptURL: String = ""
     @State private var isUploadingReceipt = false
@@ -93,9 +98,11 @@ struct AddExpensePageView: View {
                 selectedPeople: $selectedSplitPeople
             )
         }
+        #if os(iOS)
         .sheet(isPresented: $showReceiptPicker) {
             ImagePicker(image: $receiptImage)
         }
+        #endif
         .onAppear {
             withName = selectedItem?.name ?? ""
             if isGroup {
@@ -115,7 +122,9 @@ struct AddExpensePageView: View {
             }
         }
         .onChange(of: selectedItem?.id) { _, _ in
+            #if os(iOS)
             receiptImage = nil
+            #endif
             receiptURL = ""
             isUploadingReceipt = false
         }
@@ -229,14 +238,15 @@ struct AddExpensePageView: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
 
+            #if os(iOS)
             Button {
                 showReceiptPicker = true
             } label: {
                 HStack(spacing: 10) {
-                    Image(systemName: receiptImage == nil ? "camera.fill" : "checkmark.circle.fill")
+                    Image(systemName: receiptButtonIcon)
                         .font(.system(size: 16, weight: .bold))
 
-                    Text(receiptImage == nil ? "Take a picture / choose image" : "Receipt selected")
+                    Text(receiptButtonTitle)
                         .font(.system(size: 16, weight: .bold))
                 }
                 .foregroundColor(.white)
@@ -266,6 +276,22 @@ struct AddExpensePageView: View {
                     .clipped()
                     .cornerRadius(16)
             }
+            #else
+            HStack(spacing: 10) {
+                Image(systemName: "photo")
+                    .font(.system(size: 16, weight: .bold))
+
+                Text("Receipt image upload is available on iOS")
+                    .font(.system(size: 15, weight: .bold))
+            }
+            .foregroundColor(AppPalette.secondaryText)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(AppPalette.rowIconBg)
+            )
+            #endif
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
@@ -280,6 +306,16 @@ struct AddExpensePageView: View {
                 .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
         )
     }
+
+    #if os(iOS)
+    private var receiptButtonIcon: String {
+        receiptImage == nil ? "camera.fill" : "checkmark.circle.fill"
+    }
+
+    private var receiptButtonTitle: String {
+        receiptImage == nil ? "Take a picture / choose image" : "Receipt selected"
+    }
+    #endif
 
     private func inputCard(icon: String, placeholder: String, text: Binding<String>) -> some View {
         HStack(spacing: 14) {
@@ -327,8 +363,7 @@ struct AddExpensePageView: View {
                 )
 
             VStack(alignment: .leading, spacing: 8) {
-                TextField("Enter amount", text: $amountText)
-                    .keyboardType(.decimalPad)
+                amountTextField
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(AppPalette.primaryText)
 
@@ -348,6 +383,16 @@ struct AddExpensePageView: View {
                 )
                 .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 6)
         )
+    }
+
+    @ViewBuilder
+    private var amountTextField: some View {
+        #if os(iOS)
+        TextField("Enter amount", text: $amountText)
+            .keyboardType(.decimalPad)
+        #else
+        TextField("Enter amount", text: $amountText)
+        #endif
     }
 
     private var splitButtonsSection: some View {
@@ -500,20 +545,7 @@ struct AddExpensePageView: View {
                         .foregroundColor(AppPalette.primaryText)
                         .frame(width: 90, alignment: .leading)
 
-                    TextField("0.00", text: bindingForPaidAmount(person))
-                        .keyboardType(.decimalPad)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(AppPalette.primaryText)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(AppPalette.searchField)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                        .stroke(AppPalette.border, lineWidth: 1)
-                                )
-                        )
+                    paidAmountField(for: person)
                 }
             }
 
@@ -546,6 +578,40 @@ struct AddExpensePageView: View {
                 )
                 .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 5)
         )
+    }
+
+    @ViewBuilder
+    private func paidAmountField(for person: String) -> some View {
+        #if os(iOS)
+        TextField("0.00", text: bindingForPaidAmount(person))
+            .keyboardType(.decimalPad)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(AppPalette.primaryText)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(AppPalette.searchField)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(AppPalette.border, lineWidth: 1)
+                    )
+            )
+        #else
+        TextField("0.00", text: bindingForPaidAmount(person))
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(AppPalette.primaryText)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(AppPalette.searchField)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .stroke(AppPalette.border, lineWidth: 1)
+                    )
+            )
+        #endif
     }
 
     private var summaryCard: some View {
@@ -763,59 +829,63 @@ extension AddExpensePageView {
             paidAmounts: paidAmountsDictionary
         ) : nil
 
-        guard let image = receiptImage,
-              let data = image.jpegData(compressionQuality: 0.6) else {
-            onSaveExpense(
-                selectedItem.id,
-                descriptionText,
-                calculatedAmount,
-                activeDirection,
-                draft,
-                nil
-            )
-            resetAfterSave(for: selectedItem)
+        #if os(iOS)
+        if let image = receiptImage,
+           let data = image.jpegData(compressionQuality: 0.6) {
+            isUploadingReceipt = true
+            let expenseId = UUID().uuidString
+
+            FirebaseService.shared.uploadReceiptImage(expenseId: expenseId, data: data) { result in
+                DispatchQueue.main.async {
+                    isUploadingReceipt = false
+
+                    switch result {
+                    case .success(let url):
+                        receiptURL = url
+                        onSaveExpense(
+                            selectedItem.id,
+                            descriptionText,
+                            calculatedAmount,
+                            activeDirection,
+                            draft,
+                            url
+                        )
+                    case .failure:
+                        onSaveExpense(
+                            selectedItem.id,
+                            descriptionText,
+                            calculatedAmount,
+                            activeDirection,
+                            draft,
+                            nil
+                        )
+                    }
+
+                    resetAfterSave(for: selectedItem)
+                }
+            }
             return
         }
+        #endif
 
-        isUploadingReceipt = true
-        let expenseId = UUID().uuidString
-
-        FirebaseService.shared.uploadReceiptImage(expenseId: expenseId, data: data) { result in
-            DispatchQueue.main.async {
-                isUploadingReceipt = false
-
-                switch result {
-                case .success(let url):
-                    receiptURL = url
-                    onSaveExpense(
-                        selectedItem.id,
-                        descriptionText,
-                        calculatedAmount,
-                        activeDirection,
-                        draft,
-                        url
-                    )
-                case .failure:
-                    onSaveExpense(
-                        selectedItem.id,
-                        descriptionText,
-                        calculatedAmount,
-                        activeDirection,
-                        draft,
-                        nil
-                    )
-                }
-
-                resetAfterSave(for: selectedItem)
-            }
-        }
+        onSaveExpense(
+            selectedItem.id,
+            descriptionText,
+            calculatedAmount,
+            activeDirection,
+            draft,
+            nil
+        )
+        resetAfterSave(for: selectedItem)
     }
 
     private func resetAfterSave(for item: BalanceItem) {
         descriptionText = ""
         amountText = ""
         paidAmountsText = [:]
+        #if os(iOS)
         receiptImage = nil
+        #endif
         receiptURL = ""
         selectedTab = item.kind == .group ? .friends : .home
     }
@@ -864,24 +934,32 @@ struct GroupMemberPickerSheet: View {
                                     .foregroundColor(selectedPeople.contains(person) ? AppPalette.accentMid : AppPalette.secondaryText.opacity(0.5))
                             }
                             .padding(.horizontal, 20)
-                            .padding(.vertical, 16)
+                            .padding(.vertical, 14)
                         }
                         .buttonStyle(.plain)
 
-                        Divider()
+                        if person != people.last {
+                            Divider()
+                                .padding(.leading, 20)
+                        }
                     }
                 }
             }
         }
+        .background(
+            LinearGradient(
+                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .presentationDetents([.medium, .large])
-        .background(AppPalette.backgroundBottom)
     }
 
     private func toggle(_ person: String) {
         if selectedPeople.contains(person) {
-            if selectedPeople.count > 1 {
-                selectedPeople.remove(person)
-            }
+            selectedPeople.remove(person)
         } else {
             selectedPeople.insert(person)
         }

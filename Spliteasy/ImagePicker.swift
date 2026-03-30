@@ -5,7 +5,17 @@
 //  Created by SIDHARTHA JAVVADI on 3/27/26.
 //
 
+//
+//  ImagePicker.swift
+//  Spliteasy
+//
+//  Created by SIDHARTHA JAVVADI on 3/27/26.
+//
+
 import SwiftUI
+
+#if canImport(UIKit) && canImport(PhotosUI)
+import UIKit
 import PhotosUI
 
 struct ImagePicker: UIViewControllerRepresentable {
@@ -48,3 +58,32 @@ struct ImagePicker: UIViewControllerRepresentable {
         }
     }
 }
+
+#else
+
+struct ImagePicker: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "photo")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(AppPalette.accentMid)
+
+            Text("Image picker is only available on iOS.")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 20)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(
+            LinearGradient(
+                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
+    }
+}
+
+#endif

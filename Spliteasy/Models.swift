@@ -161,6 +161,7 @@ struct TransactionItem: Identifiable, Hashable {
     let date: String
     let monthKey: String
     let category: String
+    let entryType: String
 
     init(
         id: String = UUID().uuidString,
@@ -169,7 +170,8 @@ struct TransactionItem: Identifiable, Hashable {
         amount: Double,
         date: String,
         monthKey: String,
-        category: String
+        category: String,
+        entryType: String = "expense"
     ) {
         self.id = id
         self.title = title
@@ -178,6 +180,7 @@ struct TransactionItem: Identifiable, Hashable {
         self.date = date
         self.monthKey = monthKey
         self.category = category
+        self.entryType = entryType
     }
 }
 

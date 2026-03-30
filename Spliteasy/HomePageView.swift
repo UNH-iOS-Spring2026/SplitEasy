@@ -277,8 +277,7 @@ struct MonthlyLimitSheet: View {
                     .font(.system(size: 24, weight: .bold))
                     .foregroundColor(AppPalette.primaryText)
 
-                TextField("Enter monthly limit", text: $amountText)
-                    .keyboardType(.decimalPad)
+                amountField
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(AppPalette.primaryText)
                     .padding(.horizontal, 16)
@@ -347,6 +346,15 @@ struct MonthlyLimitSheet: View {
                 amountText = currentLimit > 0 ? String(format: "%.2f", currentLimit) : ""
             }
         }
-        .presentationDetents([.medium])
+    }
+
+    @ViewBuilder
+    private var amountField: some View {
+        #if os(iOS)
+        TextField("Enter monthly limit", text: $amountText)
+            .keyboardType(.decimalPad)
+        #else
+        TextField("Enter monthly limit", text: $amountText)
+        #endif
     }
 }

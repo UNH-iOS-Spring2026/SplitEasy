@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct AccountPageView: View {
     @Binding var showThemeMenu: Bool
@@ -17,7 +20,10 @@ struct AccountPageView: View {
     @State private var phoneText: String = ""
     @State private var passwordText: String = ""
 
+    #if os(iOS)
     @State private var selectedImage: UIImage?
+    #endif
+
     @State private var showImagePicker = false
     @State private var profileImageURL: String = ""
     @State private var isUploadingProfileImage = false
@@ -75,9 +81,14 @@ struct AccountPageView: View {
             syncFromBindings()
             loadProfile()
         }
+        #if os(iOS)
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $selectedImage)
         }
+        .onChange(of: selectedImage) { _, newImage in
+            uploadProfileImage(newImage)
+        }
+        #endif
         .sheet(isPresented: $showNotificationsSheet) {
             notificationsSheet
         }
@@ -86,9 +97,6 @@ struct AccountPageView: View {
         }
         .sheet(isPresented: $showSupportSheet) {
             supportSheet
-        }
-        .onChange(of: selectedImage) { _, newImage in
-            uploadProfileImage(newImage)
         }
         .onChange(of: phoneText) { _, newValue in
             let formatted = formattedPhone(newValue)
@@ -127,7 +135,9 @@ struct AccountPageView: View {
     private var profileCard: some View {
         VStack(spacing: 12) {
             Button {
+                #if os(iOS)
                 showImagePicker = true
+                #endif
             } label: {
                 ZStack {
                     if let url = URL(string: profileImageURL),
@@ -171,13 +181,12 @@ struct AccountPageView: View {
                 }
             }
             .buttonStyle(.plain)
-            
 
             Text(displayNickname)
                 .font(.system(size: 24, weight: .bold))
                 .foregroundColor(AppPalette.primaryText)
 
-            Text(isUploadingProfileImage ? "Uploading image..." : "Tap image to update")
+            Text(profileImageHintText)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
         }
@@ -186,11 +195,19 @@ struct AccountPageView: View {
         .background(cardBackground)
     }
 
+    private var profileImageHintText: String {
+        #if os(iOS)
+        return isUploadingProfileImage ? "Uploading image..." : "Tap image to update"
+        #else
+        return "Profile image upload is available on iOS"
+        #endif
+    }
+
     private var accountFieldsCard: some View {
         VStack(spacing: 16) {
             accountField(title: "Nick Name", text: $nicknameText, placeholder: "Enter nickname")
-            accountField(title: "Email", text: $emailText, placeholder: "Enter email", keyboard: .emailAddress)
-            accountField(title: "Phone", text: $phoneText, placeholder: "(xxx) xxx-xxxx", keyboard: .phonePad)
+            accountField(title: "Email", text: $emailText, placeholder: "Enter email", keyboard: .email)
+            accountField(title: "Phone", text: $phoneText, placeholder: "(xxx) xxx-xxxx", keyboard: .phone)
 
             SecureField("New password (optional)", text: $passwordText)
                 .font(.system(size: 16, weight: .semibold))
@@ -236,6 +253,42 @@ struct AccountPageView: View {
         }
         .padding(18)
         .background(cardBackground)
+    }
+
+    private func accountField(
+        title: String,
+        text: Binding<String>,
+        placeholder: String,
+        keyboard: AccountKeyboardKind = .standard
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            accountTextField(placeholder: placeholder, text: text, keyboard: keyboard)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(fieldBackground)
+        }
+    }
+
+    @ViewBuilder
+    private func accountTextField(
+        placeholder: String,
+        text: Binding<String>,
+        keyboard: AccountKeyboardKind
+    ) -> some View {
+        #if os(iOS)
+        TextField(placeholder, text: text)
+            .keyboardType(keyboard.uiKeyboardType)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+        #else
+        TextField(placeholder, text: text)
+        #endif
     }
 
     private var quickActionsCard: some View {
@@ -289,29 +342,6 @@ struct AccountPageView: View {
                 )
         }
         .buttonStyle(.plain)
-    }
-
-    private func accountField(
-        title: String,
-        text: Binding<String>,
-        placeholder: String,
-        keyboard: UIKeyboardType = .default
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundColor(AppPalette.secondaryText)
-
-            TextField(placeholder, text: text)
-                .keyboardType(keyboard)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppPalette.primaryText)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
-                .background(fieldBackground)
-        }
     }
 
     private func profileActionRow(
@@ -636,6 +666,7 @@ struct AccountPageView: View {
         }
     }
 
+    #if os(iOS)
     private func uploadProfileImage(_ image: UIImage?) {
         guard let image,
               let data = image.jpegData(compressionQuality: 0.6) else { return }
@@ -675,6 +706,8 @@ struct AccountPageView: View {
             }
         }
     }
+    #endif
+
     private func saveProfile() {
         let trimmedNickname = nicknameText.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedEmail = emailText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -733,10 +766,11 @@ struct AccountPageView: View {
 
         if limited.isEmpty { return "" }
         if limited.count < 4 { return limited }
+
         if limited.count < 7 {
-            let area = limited.prefix(3)
-            let rest = limited.dropFirst(3)
-            return "(\(area)) \(rest)"
+            let first = limited.prefix(3)
+            let second = limited.dropFirst(3)
+            return "(\(first)) \(second)"
         }
 
         let area = limited.prefix(3)
@@ -746,4 +780,21 @@ struct AccountPageView: View {
     }
 }
 
+enum AccountKeyboardKind {
+    case standard
+    case email
+    case phone
 
+    #if os(iOS)
+    var uiKeyboardType: UIKeyboardType {
+        switch self {
+        case .standard:
+            return .default
+        case .email:
+            return .emailAddress
+        case .phone:
+            return .phonePad
+        }
+    }
+    #endif
+}

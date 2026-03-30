@@ -423,7 +423,8 @@ struct ContentView: View {
                             amount: $0.amount,
                             date: $0.date,
                             monthKey: $0.monthKey,
-                            category: $0.category
+                            category: $0.category,
+                            entryType: $0.entryType
                         )
                     }
 
@@ -523,8 +524,19 @@ struct ContentView: View {
 
     private var currentMonthSpent: Double {
         let currentMonthKey = monthKey(for: Date())
+
         return activityTransactions
-            .filter { $0.monthKey == currentMonthKey }
+            .filter { item in
+                guard item.monthKey == currentMonthKey else { return false }
+
+                let normalizedType = item.entryType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                let normalizedTitle = item.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+                if normalizedType == "settlement" { return false }
+                if normalizedTitle.hasPrefix("settle up with") { return false }
+
+                return true
+            }
             .reduce(0) { $0 + $1.amount }
     }
 
@@ -972,26 +984,30 @@ struct ContentView: View {
         showFriendDetailPage = false
         showSettleUpSelectionPage = false
         showSettleUpPage = false
-        selectedTab = .home
-        selectedSection = .friends
+        settleUpReturnToFriendDetail = false
 
-        profileName = ""
-        profileEmail = ""
-        profilePhone = ""
-        monthlyLimit = 0
-        savedThemeMode = AppThemeMode.auto.rawValue
-        recentNotifications = []
-        friendsData = []
-        groupsData = []
-        activityTransactions = []
         selectedFriendDetail = nil
         selectedExpenseTarget = nil
         selectedSettleTarget = nil
 
+        friendsData = []
+        groupsData = []
+        activityTransactions = []
+        recentNotifications = []
+
+        monthlyLimit = 0
+        profileName = ""
+        profileEmail = ""
+        profilePhone = ""
+
+        selectedTab = .home
+        selectedSection = .friends
+        selectedFilter = .none
+
         isLoggedIn = false
+        isCheckingSession = false
     }
 }
-
 #Preview {
     ContentView()
 }

@@ -5,15 +5,7 @@
 //  Created by SIDHARTHA JAVVADI on 3/27/26.
 //
 
-//
-//  FirebaseService.swift
-//  Spliteasy
-//
-//  Created by SIDHARTHA JAVVADI on 3/27/26.
-//
-
 import Foundation
-import UIKit
 import FirebaseAuth
 import FirebaseFirestore
 import FirebaseStorage
@@ -84,6 +76,7 @@ struct FirestoreActivityRecord {
     let date: String
     let monthKey: String
     let category: String
+    let entryType: String
 
     init(documentId: String, data: [String: Any]) {
         self.documentId = documentId
@@ -93,6 +86,13 @@ struct FirestoreActivityRecord {
         self.date = data["date"] as? String ?? ""
         self.monthKey = data["monthKey"] as? String ?? ""
         self.category = data["category"] as? String ?? "Other"
+
+        if let storedType = data["entryType"] as? String, !storedType.isEmpty {
+            self.entryType = storedType
+        } else {
+            let normalizedTitle = self.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            self.entryType = normalizedTitle.hasPrefix("settle up with") ? "settlement" : "expense"
+        }
     }
 }
 
@@ -744,6 +744,7 @@ final class FirebaseService {
                 "date": payload.dateText,
                 "monthKey": payload.monthKey,
                 "category": payload.category,
+                "entryType": "expense",
                 "createdAt": FieldValue.serverTimestamp()
             ]
 
@@ -830,6 +831,7 @@ final class FirebaseService {
                 "date": dayText,
                 "monthKey": monthKey,
                 "category": "Other",
+                "entryType": "settlement",
                 "createdAt": FieldValue.serverTimestamp()
             ]
 

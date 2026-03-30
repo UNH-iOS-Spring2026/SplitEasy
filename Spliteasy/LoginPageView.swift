@@ -55,7 +55,7 @@ struct LoginPageView: View {
                 .padding(.horizontal, 24)
 
                 VStack(spacing: 16) {
-                    field(title: "Email", text: $email, placeholder: "Enter email")
+                    field(title: "Email", text: $email, placeholder: "Enter email", isEmail: true)
 
                     passwordField(
                         title: selectedMode == .login ? "Password" : "Create Password",
@@ -198,18 +198,14 @@ struct LoginPageView: View {
         }
     }
 
-    private func field(title: String, text: Binding<String>, placeholder: String) -> some View {
+    private func field(title: String, text: Binding<String>, placeholder: String, isEmail: Bool) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            TextField(placeholder, text: text)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .keyboardType(.emailAddress)
-                .textContentType(.emailAddress)
+            loginTextField(text: text, placeholder: placeholder, isEmail: isEmail)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(AppPalette.primaryText)
                 .padding(.horizontal, 16)
@@ -225,6 +221,19 @@ struct LoginPageView: View {
         }
     }
 
+    @ViewBuilder
+    private func loginTextField(text: Binding<String>, placeholder: String, isEmail: Bool) -> some View {
+        #if os(iOS)
+        TextField(placeholder, text: text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .keyboardType(isEmail ? .emailAddress : .default)
+            .textContentType(isEmail ? .emailAddress : .none)
+        #else
+        TextField(placeholder, text: text)
+        #endif
+    }
+
     private func passwordField(title: String, text: Binding<String>, placeholder: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
@@ -232,11 +241,7 @@ struct LoginPageView: View {
                 .foregroundColor(AppPalette.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            SecureField(placeholder, text: text)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled(true)
-                .textContentType(.oneTimeCode)
-                .keyboardType(.default)
+            securePasswordField(text: text, placeholder: placeholder)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(AppPalette.primaryText)
                 .padding(.horizontal, 16)
@@ -250,6 +255,18 @@ struct LoginPageView: View {
                         )
                 )
         }
+    }
+
+    @ViewBuilder
+    private func securePasswordField(text: Binding<String>, placeholder: String) -> some View {
+        #if os(iOS)
+        SecureField(placeholder, text: text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .textContentType(.oneTimeCode)
+        #else
+        SecureField(placeholder, text: text)
+        #endif
     }
 }
 
@@ -292,11 +309,7 @@ struct ForgotPasswordPageView: View {
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(AppPalette.secondaryText)
 
-                        TextField("Enter email", text: $email)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled(true)
-                            .keyboardType(.emailAddress)
-                            .textContentType(.emailAddress)
+                        forgotPasswordEmailField
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundColor(AppPalette.primaryText)
                             .padding(.horizontal, 16)
@@ -376,6 +389,19 @@ struct ForgotPasswordPageView: View {
         }
     }
 
+    @ViewBuilder
+    private var forgotPasswordEmailField: some View {
+        #if os(iOS)
+        TextField("Enter email", text: $email)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .keyboardType(.emailAddress)
+            .textContentType(.emailAddress)
+        #else
+        TextField("Enter email", text: $email)
+        #endif
+    }
+
     private func sendResetLink() {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         errorMessage = ""
@@ -423,8 +449,7 @@ struct ForgotPasswordPageView: View {
 
             Spacer()
 
-            Color.clear
-                .frame(width: 46, height: 46)
+            Color.clear.frame(width: 46, height: 46)
         }
     }
 }
