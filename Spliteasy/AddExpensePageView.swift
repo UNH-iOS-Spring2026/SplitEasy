@@ -887,7 +887,6 @@ extension AddExpensePageView {
         receiptImage = nil
         #endif
         receiptURL = ""
-        selectedTab = item.kind == .group ? .friends : .home
     }
 }
 

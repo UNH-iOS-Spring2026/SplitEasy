@@ -14,10 +14,14 @@ struct FriendDetailPageView: View {
     let onAddExpense: (BalanceItem) -> Void
     let onSettleUp: (BalanceItem) -> Void
     let onRefresh: (() -> Void)?
+    let onToggleBlock: (BalanceItem) -> Void
+    let onRemoveFriend: (BalanceItem) -> Void
 
     @State private var isImagePreviewPresented = false
     @State private var previewReceiptURL: String = ""
     @State private var isRefreshing = false
+    @State private var showBlockConfirm = false
+    @State private var showRemoveConfirm = false
 
     private let themePurple = AppPalette.accentMid
 
@@ -27,7 +31,9 @@ struct FriendDetailPageView: View {
         showFriendDetailPage: Binding<Bool>,
         onAddExpense: @escaping (BalanceItem) -> Void,
         onSettleUp: @escaping (BalanceItem) -> Void,
-        onRefresh: (() -> Void)? = nil
+        onRefresh: (() -> Void)? = nil,
+        onToggleBlock: @escaping (BalanceItem) -> Void,
+        onRemoveFriend: @escaping (BalanceItem) -> Void
     ) {
         self.friend = friend
         self._selectedTab = selectedTab
@@ -35,6 +41,8 @@ struct FriendDetailPageView: View {
         self.onAddExpense = onAddExpense
         self.onSettleUp = onSettleUp
         self.onRefresh = onRefresh
+        self.onToggleBlock = onToggleBlock
+        self.onRemoveFriend = onRemoveFriend
     }
 
     var body: some View {
@@ -56,6 +64,7 @@ struct FriendDetailPageView: View {
                         friendNameCard
                         actionCards
                         recentExpensesSection
+                        managementSection
 
                         Spacer(minLength: 120)
                     }
@@ -78,6 +87,36 @@ struct FriendDetailPageView: View {
         }
         .sheet(isPresented: $isImagePreviewPresented) {
             receiptPreviewSheet
+        }
+        .confirmationDialog(
+            friend.isBlocked ? "Unblock User" : "Block User",
+            isPresented: $showBlockConfirm,
+            titleVisibility: .visible
+        ) {
+            Button(friend.isBlocked ? "Unblock User" : "Block User") {
+                onToggleBlock(friend)
+            }
+
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text(
+                friend.isBlocked
+                ? "This user will be able to add expenses again after unblocking."
+                : "After blocking, no new expenses can be added for this friend until you unblock them."
+            )
+        }
+        .confirmationDialog(
+            "Remove Friend",
+            isPresented: $showRemoveConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Delete Friend", role: .destructive) {
+                onRemoveFriend(friend)
+            }
+
+            Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This will remove this friend from your app and database. You can add them again later if needed.")
         }
     }
 
@@ -151,7 +190,7 @@ struct FriendDetailPageView: View {
                 )
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Friend")
+                Text(friend.isBlocked ? "Blocked Friend" : "Friend")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(AppPalette.secondaryText)
 
@@ -160,9 +199,15 @@ struct FriendDetailPageView: View {
                     .italic()
                     .foregroundColor(AppPalette.primaryText)
 
-                Text(friend.balanceText)
-                    .font(.system(size: 15, weight: .bold))
-                    .foregroundColor(friend.direction == .owesYou ? .green.opacity(0.85) : .red.opacity(0.85))
+                if friend.isBlocked {
+                    Text("User is blocked")
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.orange.opacity(0.9))
+                } else {
+                    Text(friend.balanceText)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(friend.direction == .owesYou ? .green.opacity(0.85) : .red.opacity(0.85))
+                }
             }
 
             Spacer()
@@ -177,23 +222,33 @@ struct FriendDetailPageView: View {
             Button {
                 onSettleUp(friend)
             } label: {
-                actionCardContent(icon: "arrow.left.arrow.right", title: "Settle up")
+                actionCardContent(
+                    icon: "arrow.left.arrow.right",
+                    title: "Settle up",
+                    subtitle: friend.isBlocked ? "Unavailable while blocked" : nil
+                )
             }
             .buttonStyle(.plain)
+            .disabled(friend.isBlocked)
+            .opacity(friend.isBlocked ? 0.55 : 1)
 
             Button {
                 Task {
                     await refreshData()
                 }
             } label: {
-                actionCardContent(icon: "arrow.clockwise", title: "Refresh")
+                actionCardContent(
+                    icon: "arrow.clockwise",
+                    title: "Refresh",
+                    subtitle: nil
+                )
             }
             .buttonStyle(.plain)
         }
     }
 
-    private func actionCardContent(icon: String, title: String) -> some View {
-        VStack(spacing: 12) {
+    private func actionCardContent(icon: String, title: String, subtitle: String?) -> some View {
+        VStack(spacing: 10) {
             Image(systemName: icon)
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundColor(themePurple)
@@ -201,9 +256,16 @@ struct FriendDetailPageView: View {
             Text(title)
                 .font(.system(size: 18, weight: .bold))
                 .foregroundColor(AppPalette.primaryText)
+
+            if let subtitle {
+                Text(subtitle)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
+                    .multilineTextAlignment(.center)
+            }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 100)
+        .frame(height: 108)
         .background(cardBackground(cornerRadius: 22))
     }
 
@@ -254,6 +316,91 @@ struct FriendDetailPageView: View {
                         expenseCard(expense)
                     }
                 }
+            }
+        }
+    }
+
+    private var managementSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Manage Friend")
+                .font(.system(size: 22, weight: .bold))
+                .italic()
+                .foregroundColor(AppPalette.primaryText)
+
+            VStack(spacing: 12) {
+                Button {
+                    showBlockConfirm = true
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color.orange.opacity(0.12))
+                                .frame(width: 50, height: 50)
+
+                            Image(systemName: friend.isBlocked ? "lock.open.fill" : "hand.raised.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.orange.opacity(0.9))
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(friend.isBlocked ? "Unblock User" : "Block User")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundColor(AppPalette.primaryText)
+
+                            Text(
+                                friend.isBlocked
+                                ? "Allow expenses again"
+                                : "Stop future expenses until unblocked"
+                            )
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppPalette.secondaryText)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(AppPalette.secondaryText)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(cardBackground(cornerRadius: 22))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showRemoveConfirm = true
+                } label: {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(Color.red.opacity(0.12))
+                                .frame(width: 50, height: 50)
+
+                            Image(systemName: "trash.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.red.opacity(0.9))
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Delete Friend")
+                                .font(.system(size: 17, weight: .bold))
+                                .foregroundColor(AppPalette.primaryText)
+
+                            Text("Remove from app and database")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(AppPalette.secondaryText)
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
+                            .foregroundColor(AppPalette.secondaryText)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(cardBackground(cornerRadius: 22))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -411,21 +558,33 @@ struct FriendDetailPageView: View {
         Button {
             onAddExpense(friend)
         } label: {
-            Text("Add Expense")
-                .font(.system(size: 20, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    LinearGradient(
-                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
+            VStack(spacing: 4) {
+                Text(friend.isBlocked ? "User Blocked" : "Add Expense")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundColor(.white)
+
+                if friend.isBlocked {
+                    Text("Unblock user to continue")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.9))
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(
+                LinearGradient(
+                    colors: friend.isBlocked
+                    ? [Color.gray.opacity(0.8), Color.gray.opacity(0.7)]
+                    : [AppPalette.accentStart, AppPalette.accentEnd],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .buttonStyle(.plain)
+        .disabled(friend.isBlocked)
+        .opacity(friend.isBlocked ? 0.8 : 1)
     }
 
     private func cardBackground(cornerRadius: CGFloat = 24) -> some View {

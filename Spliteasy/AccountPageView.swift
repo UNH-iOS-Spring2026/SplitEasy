@@ -10,15 +10,15 @@ struct AccountPageView: View {
     @Binding var profilePhone: String
 
     let notifications: [AppNotificationItem]
-    let onSaveProfile: (String, String, String, String) -> Void
+    let onSaveProfile: (String, String, String) -> Void
     let onSubmitFeedback: (Int, String) -> Void
     let onContactSupport: (String, String) -> Void
+    let onResetPassword: (String, String, @escaping (Result<Void, Error>) -> Void) -> Void
     let onSignOut: () -> Void
 
     @State private var nicknameText: String = ""
     @State private var emailText: String = ""
     @State private var phoneText: String = ""
-    @State private var passwordText: String = ""
 
     #if os(iOS)
     @State private var selectedImage: UIImage?
@@ -34,10 +34,19 @@ struct AccountPageView: View {
     @State private var showNotificationsSheet = false
     @State private var showFeedbackSheet = false
     @State private var showSupportSheet = false
+    @State private var showResetPasswordSheet = false
+
     @State private var feedbackRating = 0
     @State private var feedbackMessage = ""
     @State private var supportSubject = ""
     @State private var supportMessage = ""
+
+    @State private var currentPassword = ""
+    @State private var newPassword = ""
+    @State private var reenteredPassword = ""
+    @State private var resetPasswordMessage = ""
+    @State private var resetPasswordMessageColor: Color = .green.opacity(0.85)
+    @State private var isUpdatingPassword = false
 
     var body: some View {
         ZStack {
@@ -98,6 +107,9 @@ struct AccountPageView: View {
         .sheet(isPresented: $showSupportSheet) {
             supportSheet
         }
+        .sheet(isPresented: $showResetPasswordSheet) {
+            resetPasswordSheet
+        }
         .onChange(of: phoneText) { _, newValue in
             let formatted = formattedPhone(newValue)
             if formatted != newValue {
@@ -110,9 +122,6 @@ struct AccountPageView: View {
             clearProfileMessage()
         }
         .onChange(of: emailText) { _, _ in
-            clearProfileMessage()
-        }
-        .onChange(of: passwordText) { _, _ in
             clearProfileMessage()
         }
     }
@@ -209,13 +218,6 @@ struct AccountPageView: View {
             accountField(title: "Email", text: $emailText, placeholder: "Enter email", keyboard: .email)
             accountField(title: "Phone", text: $phoneText, placeholder: "(xxx) xxx-xxxx", keyboard: .phone)
 
-            SecureField("New password (optional)", text: $passwordText)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(AppPalette.primaryText)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 14)
-                .background(fieldBackground)
-
             if !profileMessage.isEmpty {
                 Text(profileMessage)
                     .font(.system(size: 13, weight: .semibold))
@@ -250,6 +252,29 @@ struct AccountPageView: View {
             .buttonStyle(.plain)
             .disabled(isSavingProfile || isUploadingProfileImage || !canSaveProfile)
             .opacity((isSavingProfile || isUploadingProfileImage || !canSaveProfile) ? 0.65 : 1)
+
+            Button {
+                resetPasswordMessage = ""
+                currentPassword = ""
+                newPassword = ""
+                reenteredPassword = ""
+                showResetPasswordSheet = true
+            } label: {
+                Text("Reset Password")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(AppPalette.accentMid)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(AppPalette.card)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(AppPalette.accentMid.opacity(0.35), lineWidth: 1.2)
+                            )
+                    )
+            }
+            .buttonStyle(.plain)
         }
         .padding(18)
         .background(cardBackground)
@@ -568,6 +593,91 @@ struct AccountPageView: View {
         .presentationDetents([.medium, .large])
     }
 
+    private var resetPasswordSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                resetSecureField(title: "Current Password", text: $currentPassword, placeholder: "Enter current password")
+                resetSecureField(title: "New Password", text: $newPassword, placeholder: "Enter new password")
+                resetSecureField(title: "Re-enter New Password", text: $reenteredPassword, placeholder: "Re-enter new password")
+
+                if !resetPasswordMessage.isEmpty {
+                    Text(resetPasswordMessage)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(resetPasswordMessageColor)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Button {
+                    updatePassword()
+                } label: {
+                    HStack(spacing: 10) {
+                        if isUpdatingPassword {
+                            ProgressView()
+                                .tint(.white)
+                        }
+
+                        Text("Update Password")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(
+                        LinearGradient(
+                            colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .disabled(isUpdatingPassword || !canUpdatePassword)
+                .opacity((isUpdatingPassword || !canUpdatePassword) ? 0.65 : 1)
+
+                Spacer()
+            }
+            .padding(20)
+            .navigationTitle("Reset Password")
+            .background(
+                LinearGradient(
+                    colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func resetSecureField(title: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            resetSecureInput(text: text, placeholder: placeholder)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(fieldBackground)
+        }
+    }
+
+    @ViewBuilder
+    private func resetSecureInput(text: Binding<String>, placeholder: String) -> some View {
+        #if os(iOS)
+        SecureField(placeholder, text: text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled(true)
+            .textContentType(.oneTimeCode)
+        #else
+        SecureField(placeholder, text: text)
+        #endif
+    }
+
     private var displayNickname: String {
         let trimmed = nicknameText.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? "Add nickname" : trimmed
@@ -626,6 +736,12 @@ struct AccountPageView: View {
         !nicknameText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !emailText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         !phoneText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var canUpdatePassword: Bool {
+        !currentPassword.isEmpty &&
+        newPassword.count >= 6 &&
+        reenteredPassword == newPassword
     }
 
     private func syncFromBindings() {
@@ -716,7 +832,7 @@ struct AccountPageView: View {
         clearProfileMessage()
         isSavingProfile = true
 
-        onSaveProfile(trimmedNickname, trimmedEmail, trimmedPhone, passwordText)
+        onSaveProfile(trimmedNickname, trimmedEmail, trimmedPhone)
 
         FirebaseService.shared.fetchCurrentUserProfile { result in
             DispatchQueue.main.async {
@@ -732,11 +848,8 @@ struct AccountPageView: View {
                     profileEmail = emailText
                     profilePhone = phoneText
 
-                    profileMessage = passwordText.isEmpty
-                        ? "Profile saved successfully."
-                        : "Profile saved. Use Forgot Password on login if you want to reset password by email."
+                    profileMessage = "Profile saved successfully."
                     profileMessageColor = .green.opacity(0.85)
-                    passwordText = ""
 
                 case .failure:
                     profileName = trimmedNickname
@@ -744,11 +857,45 @@ struct AccountPageView: View {
                     profilePhone = trimmedPhone
                     nicknameText = trimmedNickname
 
-                    profileMessage = passwordText.isEmpty
-                        ? "Profile saved successfully."
-                        : "Profile saved. Use Forgot Password on login if you want to reset password by email."
+                    profileMessage = "Profile saved successfully."
                     profileMessageColor = .green.opacity(0.85)
-                    passwordText = ""
+                }
+            }
+        }
+    }
+
+    private func updatePassword() {
+        resetPasswordMessage = ""
+
+        guard newPassword == reenteredPassword else {
+            resetPasswordMessage = "New password and re-entered password do not match."
+            resetPasswordMessageColor = .red.opacity(0.85)
+            return
+        }
+
+        guard newPassword.count >= 6 else {
+            resetPasswordMessage = "New password must be at least 6 characters."
+            resetPasswordMessageColor = .red.opacity(0.85)
+            return
+        }
+
+        isUpdatingPassword = true
+
+        onResetPassword(currentPassword, newPassword) { result in
+            DispatchQueue.main.async {
+                isUpdatingPassword = false
+
+                switch result {
+                case .success:
+                    resetPasswordMessage = "Password updated successfully."
+                    resetPasswordMessageColor = .green.opacity(0.85)
+                    currentPassword = ""
+                    newPassword = ""
+                    reenteredPassword = ""
+
+                case .failure(let error):
+                    resetPasswordMessage = error.localizedDescription
+                    resetPasswordMessageColor = .red.opacity(0.85)
                 }
             }
         }

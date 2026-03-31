@@ -38,6 +38,7 @@ struct FirestoreFriendRecord {
     let friendContact: String
     let balanceAmount: Double
     let balanceDirection: String
+    let isBlocked: Bool
 
     init(documentId: String, data: [String: Any]) {
         self.documentId = documentId
@@ -45,6 +46,7 @@ struct FirestoreFriendRecord {
         self.friendContact = data["friendContact"] as? String ?? ""
         self.balanceAmount = data["balanceAmount"] as? Double ?? 0
         self.balanceDirection = data["balanceDirection"] as? String ?? "owesYou"
+        self.isBlocked = data["isBlocked"] as? Bool ?? false
     }
 }
 
@@ -158,11 +160,23 @@ final class FirebaseService {
     }
 
     func registerUser(
+        firstName: String,
+        lastName: String,
+        phone: String,
         email: String,
         password: String,
         completion: @escaping (Result<String, Error>) -> Void
     ) {
-        auth.createUser(withEmail: email, password: password) { [weak self] result, error in
+        let cleanedFirstName = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedLastName = lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let cleanedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedPhone = Self.normalizedPhoneDigits(phone)
+        let formattedPhone = Self.formattedPhoneNumber(from: normalizedPhone)
+        let fullName = [cleanedFirstName, cleanedLastName]
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+
+        auth.createUser(withEmail: cleanedEmail, password: password) { [weak self] result, error in
             if let error {
                 completion(.failure(error))
                 return
@@ -171,10 +185,13 @@ final class FirebaseService {
             guard let self, let user = result?.user else { return }
 
             let userData: [String: Any] = [
-                "fullName": "",
-                "nickname": "",
-                "email": email,
-                "phone": "",
+                "firstName": cleanedFirstName,
+                "lastName": cleanedLastName,
+                "fullName": fullName,
+                "nickname": cleanedFirstName,
+                "email": cleanedEmail,
+                "phone": formattedPhone,
+                "phoneDigits": normalizedPhone,
                 "profileImageURL": "",
                 "selectedAvatarIndex": 0,
                 "monthlyLimit": 0.0,
@@ -186,14 +203,61 @@ final class FirebaseService {
             self.db.collection("users").document(user.uid).setData(userData) { error in
                 if let error {
                     completion(.failure(error))
-                } else {
+                    return
+                }
+
+                do {
+                    try self.auth.signOut()
                     completion(.success(user.uid))
+                } catch {
+                    completion(.failure(error))
                 }
             }
         }
     }
 
     func loginUser(
+        identifier: String,
+        password: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        let cleanedIdentifier = identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if cleanedIdentifier.contains("@") {
+            loginWithEmail(email: cleanedIdentifier.lowercased(), password: password, completion: completion)
+            return
+        }
+
+        let phoneDigits = Self.normalizedPhoneDigits(cleanedIdentifier)
+        guard !phoneDigits.isEmpty else {
+            loginWithEmail(email: cleanedIdentifier.lowercased(), password: password, completion: completion)
+            return
+        }
+
+        db.collection("users")
+            .whereField("phoneDigits", isEqualTo: phoneDigits)
+            .limit(to: 1)
+            .getDocuments { [weak self] snapshot, error in
+                if let error {
+                    completion(.failure(error))
+                    return
+                }
+
+                guard
+                    let data = snapshot?.documents.first?.data(),
+                    let email = data["email"] as? String,
+                    !email.isEmpty
+                else {
+                    let fallbackEmail = self?.possibleEmailFallback(from: cleanedIdentifier) ?? cleanedIdentifier.lowercased()
+                    self?.loginWithEmail(email: fallbackEmail, password: password, completion: completion)
+                    return
+                }
+
+                self?.loginWithEmail(email: email.lowercased(), password: password, completion: completion)
+            }
+    }
+
+    private func loginWithEmail(
         email: String,
         password: String,
         completion: @escaping (Result<Void, Error>) -> Void
@@ -206,6 +270,10 @@ final class FirebaseService {
 
             self?.ensureUserDocumentExists(completion: completion)
         }
+    }
+
+    private func possibleEmailFallback(from identifier: String) -> String {
+        identifier.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 
     func ensureUserDocumentExists(
@@ -230,10 +298,13 @@ final class FirebaseService {
             }
 
             let userData: [String: Any] = [
+                "firstName": "",
+                "lastName": "",
                 "fullName": "",
                 "nickname": "",
                 "email": user.email ?? "",
                 "phone": "",
+                "phoneDigits": "",
                 "profileImageURL": "",
                 "selectedAvatarIndex": 0,
                 "monthlyLimit": 0.0,
@@ -285,11 +356,15 @@ final class FirebaseService {
             return
         }
 
+        let normalizedPhone = Self.normalizedPhoneDigits(phone)
+        let formattedPhone = Self.formattedPhoneNumber(from: normalizedPhone)
+
         let payload: [String: Any] = [
             "fullName": fullName,
             "nickname": nickname,
             "email": email,
-            "phone": phone,
+            "phone": formattedPhone,
+            "phoneDigits": normalizedPhone,
             "monthlyLimit": monthlyLimit,
             "selectedAvatarIndex": selectedAvatarIndex,
             "updatedAt": FieldValue.serverTimestamp()
@@ -300,6 +375,38 @@ final class FirebaseService {
                 completion(.failure(error))
             } else {
                 completion(.success(()))
+            }
+        }
+    }
+
+    func updateCurrentUserPassword(
+        currentPassword: String,
+        newPassword: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        guard let user = auth.currentUser, let email = user.email, !email.isEmpty else {
+            completion(.failure(NSError(
+                domain: "SplitEasy",
+                code: 401,
+                userInfo: [NSLocalizedDescriptionKey: "Unable to verify the current user email."]
+            )))
+            return
+        }
+
+        let credential = EmailAuthProvider.credential(withEmail: email, password: currentPassword)
+
+        user.reauthenticate(with: credential) { _, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            user.updatePassword(to: newPassword) { error in
+                if let error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
             }
         }
     }
@@ -407,6 +514,7 @@ final class FirebaseService {
             "friendContact": friendContact,
             "balanceAmount": 0.0,
             "balanceDirection": "owesYou",
+            "isBlocked": false,
             "createdAt": FieldValue.serverTimestamp(),
             "updatedAt": FieldValue.serverTimestamp()
         ]
@@ -443,6 +551,38 @@ final class FirebaseService {
 
                 completion(.success(records))
             }
+    }
+
+    func setFriendBlocked(
+        friendDocumentId: String,
+        isBlocked: Bool,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        db.collection("friendships").document(friendDocumentId).setData([
+            "isBlocked": isBlocked,
+            "updatedAt": FieldValue.serverTimestamp()
+        ], merge: true) { error in
+            if let error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
+    }
+
+    func deleteFriend(
+        friendDocumentId: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        let friendRef = db.collection("friendships").document(friendDocumentId)
+
+        friendRef.delete { error in
+            if let error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
+            }
+        }
     }
 
     func createGroup(
@@ -695,73 +835,95 @@ final class FirebaseService {
             return
         }
 
-        let expenseRef = db.collection("expenses").document()
-        let activityRef = db.collection("users").document(uid).collection("activity").document()
         let targetCollection = payload.targetType == "friend" ? "friendships" : "groups"
         let targetRef = db.collection(targetCollection).document(payload.targetDocumentId)
 
-        db.runTransaction({ transaction, errorPointer in
-            let snapshot: DocumentSnapshot
-            do {
-                snapshot = try transaction.getDocument(targetRef)
-            } catch let error as NSError {
-                errorPointer?.pointee = error
-                return nil
-            }
-
-            let currentAmount = snapshot.data()?["balanceAmount"] as? Double ?? 0
-            let currentDirection = snapshot.data()?["balanceDirection"] as? String ?? "owesYou"
-
-            let signedCurrent = currentDirection == "owesYou" ? currentAmount : -currentAmount
-            let signedChange = payload.direction == .owesYou ? payload.amount : -payload.amount
-            let signedUpdated = signedCurrent + signedChange
-
-            let updatedAmount = abs(signedUpdated)
-            let updatedDirection = signedUpdated >= 0 ? "owesYou" : "youOwe"
-
-            let expenseData: [String: Any] = [
-                "ownerUserId": uid,
-                "targetType": payload.targetType,
-                "targetDocumentId": payload.targetDocumentId,
-                "description": payload.description,
-                "amount": payload.amount,
-                "direction": payload.direction == .owesYou ? "owesYou" : "youOwe",
-                "category": payload.category,
-                "dateText": payload.dateText,
-                "monthKey": payload.monthKey,
-                "createdAt": FieldValue.serverTimestamp(),
-                "paidBy": payload.groupDraft?.paidBy ?? [],
-                "splitWith": payload.groupDraft?.splitWith ?? [],
-                "yourNetAmount": payload.groupDraft?.yourNetAmount ?? 0,
-                "paidAmounts": payload.groupDraft?.paidAmounts ?? [:],
-                "receiptURL": payload.receiptURL ?? ""
-            ]
-
-            let activityData: [String: Any] = [
-                "title": payload.description,
-                "subtitle": payload.activitySubtitle,
-                "amount": payload.amount,
-                "date": payload.dateText,
-                "monthKey": payload.monthKey,
-                "category": payload.category,
-                "entryType": "expense",
-                "createdAt": FieldValue.serverTimestamp()
-            ]
-
-            transaction.setData(expenseData, forDocument: expenseRef)
-            transaction.setData(activityData, forDocument: activityRef)
-            transaction.setData([
-                "balanceAmount": updatedAmount,
-                "balanceDirection": updatedDirection,
-                "updatedAt": FieldValue.serverTimestamp()
-            ], forDocument: targetRef, merge: true)
-
-            return nil
-        }) { _, error in
+        targetRef.getDocument { [weak self] snapshot, error in
             if let error {
                 completion(.failure(error))
-            } else {
-                completion(.success(()))
+                return
+            }
+
+            if payload.targetType == "friend" {
+                let isBlocked = snapshot?.data()?["isBlocked"] as? Bool ?? false
+                if isBlocked {
+                    completion(.failure(NSError(
+                        domain: "SplitEasy",
+                        code: 403,
+                        userInfo: [NSLocalizedDescriptionKey: "This user is blocked. Unblock to add expenses."]
+                    )))
+                    return
+                }
+            }
+
+            guard let self else { return }
+
+            let expenseRef = self.db.collection("expenses").document()
+            let activityRef = self.db.collection("users").document(uid).collection("activity").document()
+
+            self.db.runTransaction({ transaction, errorPointer in
+                let targetSnapshot: DocumentSnapshot
+                do {
+                    targetSnapshot = try transaction.getDocument(targetRef)
+                } catch let error as NSError {
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                let currentAmount = targetSnapshot.data()?["balanceAmount"] as? Double ?? 0
+                let currentDirection = targetSnapshot.data()?["balanceDirection"] as? String ?? "owesYou"
+
+                let signedCurrent = currentDirection == "owesYou" ? currentAmount : -currentAmount
+                let signedChange = payload.direction == .owesYou ? payload.amount : -payload.amount
+                let signedUpdated = signedCurrent + signedChange
+
+                let updatedAmount = abs(signedUpdated)
+                let updatedDirection = signedUpdated >= 0 ? "owesYou" : "youOwe"
+
+                let expenseData: [String: Any] = [
+                    "ownerUserId": uid,
+                    "targetType": payload.targetType,
+                    "targetDocumentId": payload.targetDocumentId,
+                    "description": payload.description,
+                    "amount": payload.amount,
+                    "direction": payload.direction == .owesYou ? "owesYou" : "youOwe",
+                    "category": payload.category,
+                    "dateText": payload.dateText,
+                    "monthKey": payload.monthKey,
+                    "createdAt": FieldValue.serverTimestamp(),
+                    "paidBy": payload.groupDraft?.paidBy ?? [],
+                    "splitWith": payload.groupDraft?.splitWith ?? [],
+                    "yourNetAmount": payload.groupDraft?.yourNetAmount ?? 0,
+                    "paidAmounts": payload.groupDraft?.paidAmounts ?? [:],
+                    "receiptURL": payload.receiptURL ?? ""
+                ]
+
+                let activityData: [String: Any] = [
+                    "title": payload.description,
+                    "subtitle": payload.activitySubtitle,
+                    "amount": payload.amount,
+                    "date": payload.dateText,
+                    "monthKey": payload.monthKey,
+                    "category": payload.category,
+                    "entryType": "expense",
+                    "createdAt": FieldValue.serverTimestamp()
+                ]
+
+                transaction.setData(expenseData, forDocument: expenseRef)
+                transaction.setData(activityData, forDocument: activityRef)
+                transaction.setData([
+                    "balanceAmount": updatedAmount,
+                    "balanceDirection": updatedDirection,
+                    "updatedAt": FieldValue.serverTimestamp()
+                ], forDocument: targetRef, merge: true)
+
+                return nil
+            }) { _, error in
+                if let error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
             }
         }
     }
@@ -773,87 +935,127 @@ final class FirebaseService {
         method: String,
         completion: @escaping (Result<Void, Error>) -> Void
     ) {
-        guard let uid = currentUserId else {
-            completion(.success(()))
-            return
-        }
-
-        let settlementRef = db.collection("settlements").document()
-        let activityRef = db.collection("users").document(uid).collection("activity").document()
         let friendRef = db.collection("friendships").document(friendDocumentId)
 
-        let dayFormatter = DateFormatter()
-        dayFormatter.dateFormat = "MMM d"
-        let dayText = dayFormatter.string(from: Date())
-
-        let monthFormatter = DateFormatter()
-        monthFormatter.dateFormat = "yyyy-MM"
-        let monthKey = monthFormatter.string(from: Date())
-
-        db.runTransaction({ transaction, errorPointer in
-            let snapshot: DocumentSnapshot
-            do {
-                snapshot = try transaction.getDocument(friendRef)
-            } catch let error as NSError {
-                errorPointer?.pointee = error
-                return nil
-            }
-
-            let currentAmount = snapshot.data()?["balanceAmount"] as? Double ?? 0
-            let currentDirection = snapshot.data()?["balanceDirection"] as? String ?? "owesYou"
-            let signedCurrent = currentDirection == "owesYou" ? currentAmount : -currentAmount
-
-            let signedUpdated: Double
-            if signedCurrent > 0 {
-                signedUpdated = signedCurrent - amount
-            } else {
-                signedUpdated = signedCurrent + amount
-            }
-
-            let updatedAmount = abs(signedUpdated)
-            let updatedDirection = signedUpdated >= 0 ? "owesYou" : "youOwe"
-
-            let settlementData: [String: Any] = [
-                "ownerUserId": uid,
-                "friendDocumentId": friendDocumentId,
-                "friendName": friendName,
-                "amount": amount,
-                "method": method,
-                "dateText": dayText,
-                "monthKey": monthKey,
-                "createdAt": FieldValue.serverTimestamp()
-            ]
-
-            let activityData: [String: Any] = [
-                "title": "Settle up with \(friendName)",
-                "subtitle": method,
-                "amount": amount,
-                "date": dayText,
-                "monthKey": monthKey,
-                "category": "Other",
-                "entryType": "settlement",
-                "createdAt": FieldValue.serverTimestamp()
-            ]
-
-            transaction.setData(settlementData, forDocument: settlementRef)
-            transaction.setData(activityData, forDocument: activityRef)
-            transaction.setData([
-                "balanceAmount": updatedAmount,
-                "balanceDirection": updatedDirection,
-                "updatedAt": FieldValue.serverTimestamp()
-            ], forDocument: friendRef, merge: true)
-
-            return nil
-        }) { _, error in
+        friendRef.getDocument { [weak self] snapshot, error in
             if let error {
                 completion(.failure(error))
-            } else {
+                return
+            }
+
+            let isBlocked = snapshot?.data()?["isBlocked"] as? Bool ?? false
+            if isBlocked {
+                completion(.failure(NSError(
+                    domain: "SplitEasy",
+                    code: 403,
+                    userInfo: [NSLocalizedDescriptionKey: "This user is blocked. Unblock to settle up."]
+                )))
+                return
+            }
+
+            guard let self, let uid = self.currentUserId else {
                 completion(.success(()))
+                return
+            }
+
+            let settlementRef = self.db.collection("settlements").document()
+            let activityRef = self.db.collection("users").document(uid).collection("activity").document()
+
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "MMM d"
+            let dayText = dayFormatter.string(from: Date())
+
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "yyyy-MM"
+            let monthKey = monthFormatter.string(from: Date())
+
+            self.db.runTransaction({ transaction, errorPointer in
+                let targetSnapshot: DocumentSnapshot
+                do {
+                    targetSnapshot = try transaction.getDocument(friendRef)
+                } catch let error as NSError {
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                let currentAmount = targetSnapshot.data()?["balanceAmount"] as? Double ?? 0
+                let currentDirection = targetSnapshot.data()?["balanceDirection"] as? String ?? "owesYou"
+                let signedCurrent = currentDirection == "owesYou" ? currentAmount : -currentAmount
+
+                let signedUpdated: Double
+                if signedCurrent > 0 {
+                    signedUpdated = signedCurrent - amount
+                } else {
+                    signedUpdated = signedCurrent + amount
+                }
+
+                let updatedAmount = abs(signedUpdated)
+                let updatedDirection = signedUpdated >= 0 ? "owesYou" : "youOwe"
+
+                let settlementData: [String: Any] = [
+                    "ownerUserId": uid,
+                    "friendDocumentId": friendDocumentId,
+                    "friendName": friendName,
+                    "amount": amount,
+                    "method": method,
+                    "dateText": dayText,
+                    "monthKey": monthKey,
+                    "createdAt": FieldValue.serverTimestamp()
+                ]
+
+                let activityData: [String: Any] = [
+                    "title": "Settle up with \(friendName)",
+                    "subtitle": method,
+                    "amount": amount,
+                    "date": dayText,
+                    "monthKey": monthKey,
+                    "category": "Other",
+                    "entryType": "settlement",
+                    "createdAt": FieldValue.serverTimestamp()
+                ]
+
+                transaction.setData(settlementData, forDocument: settlementRef)
+                transaction.setData(activityData, forDocument: activityRef)
+                transaction.setData([
+                    "balanceAmount": updatedAmount,
+                    "balanceDirection": updatedDirection,
+                    "updatedAt": FieldValue.serverTimestamp()
+                ], forDocument: friendRef, merge: true)
+
+                return nil
+            }) { _, error in
+                if let error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
             }
         }
     }
 
     func signOut() throws {
         try auth.signOut()
+    }
+
+    static func normalizedPhoneDigits(_ input: String) -> String {
+        String(input.filter(\.isNumber))
+    }
+
+    static func formattedPhoneNumber(from digits: String) -> String {
+        let limited = String(digits.prefix(10))
+
+        if limited.isEmpty { return "" }
+        if limited.count < 4 { return limited }
+
+        if limited.count < 7 {
+            let area = limited.prefix(3)
+            let rest = limited.dropFirst(3)
+            return "(\(area)) \(rest)"
+        }
+
+        let area = limited.prefix(3)
+        let middle = limited.dropFirst(3).prefix(3)
+        let last = limited.dropFirst(6)
+        return "(\(area)) \(middle)-\(last)"
     }
 }

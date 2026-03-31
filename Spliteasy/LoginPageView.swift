@@ -15,12 +15,19 @@ struct LoginPageView: View {
     }
 
     @State private var selectedMode: AuthMode = .login
-    @State private var email: String = ""
+
+    @State private var firstName: String = ""
+    @State private var lastName: String = ""
+    @State private var phoneNumber: String = ""
+    @State private var identifier: String = ""
+    @State private var signupEmail: String = ""
     @State private var password: String = ""
     @State private var confirmPassword: String = ""
+
     @State private var showForgotPasswordPage = false
     @State private var isLoading = false
     @State private var errorMessage = ""
+    @State private var successMessage = ""
 
     let onLogin: () -> Void
 
@@ -55,23 +62,37 @@ struct LoginPageView: View {
                 .padding(.horizontal, 24)
 
                 VStack(spacing: 16) {
-                    field(title: "Email", text: $email, placeholder: "Enter email", isEmail: true)
-
-                    passwordField(
-                        title: selectedMode == .login ? "Password" : "Create Password",
-                        text: $password,
-                        placeholder: selectedMode == .login ? "Enter password" : "Create your password"
-                    )
-
                     if selectedMode == .signup {
+                        authField(title: "First Name", placeholder: "Enter first name", text: $firstName, kind: .name)
+                        authField(title: "Last Name", placeholder: "Enter last name", text: $lastName, kind: .name)
+                        authField(title: "Phone Number", placeholder: "(xxx) xxx-xxxx", text: $phoneNumber, kind: .phone)
+                        authField(title: "Email", placeholder: "Enter email", text: $signupEmail, kind: .email)
+
+                        passwordField(
+                            title: "Create Password",
+                            text: $password,
+                            placeholder: "Create your password"
+                        )
+
                         passwordField(
                             title: "Confirm Password",
                             text: $confirmPassword,
                             placeholder: "Re-enter your password"
                         )
-                    }
+                    } else {
+                        authField(
+                            title: "Email or Phone Number",
+                            placeholder: "Enter email or phone number",
+                            text: $identifier,
+                            kind: .identifier
+                        )
 
-                    if selectedMode == .login {
+                        passwordField(
+                            title: "Password",
+                            text: $password,
+                            placeholder: "Enter password"
+                        )
+
                         HStack {
                             Spacer()
 
@@ -90,6 +111,13 @@ struct LoginPageView: View {
                         Text(errorMessage)
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(.red.opacity(0.85))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if !successMessage.isEmpty {
+                        Text(successMessage)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.green.opacity(0.90))
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
@@ -133,32 +161,63 @@ struct LoginPageView: View {
             ForgotPasswordPageView()
         }
         .onChange(of: selectedMode) { _, _ in
-            errorMessage = ""
+            clearMessages()
             password = ""
             confirmPassword = ""
         }
+        .onChange(of: phoneNumber) { _, newValue in
+            let formatted = FirebaseService.formattedPhoneNumber(
+                from: FirebaseService.normalizedPhoneDigits(newValue)
+            )
+            if formatted != newValue {
+                phoneNumber = formatted
+            }
+        }
     }
 
-    private var trimmedEmail: String {
-        email.trimmingCharacters(in: .whitespacesAndNewlines)
+    private var trimmedIdentifier: String {
+        identifier.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedSignupEmail: String {
+        signupEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private var trimmedFirstName: String {
+        firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var trimmedLastName: String {
+        lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var cleanedPhoneDigits: String {
+        FirebaseService.normalizedPhoneDigits(phoneNumber)
     }
 
     private var canSubmit: Bool {
-        guard !trimmedEmail.isEmpty, !password.isEmpty else { return false }
-        if selectedMode == .signup {
-            return password.count >= 6 && confirmPassword == password
+        switch selectedMode {
+        case .login:
+            return !trimmedIdentifier.isEmpty && !password.isEmpty
+
+        case .signup:
+            return !trimmedFirstName.isEmpty &&
+                !trimmedLastName.isEmpty &&
+                cleanedPhoneDigits.count == 10 &&
+                !trimmedSignupEmail.isEmpty &&
+                password.count >= 6 &&
+                confirmPassword == password
         }
-        return true
     }
 
     private func handlePrimaryAction() {
-        errorMessage = ""
+        clearMessages()
         isLoading = true
 
         switch selectedMode {
         case .login:
             FirebaseService.shared.loginUser(
-                email: trimmedEmail,
+                identifier: trimmedIdentifier,
                 password: password
             ) { result in
                 DispatchQueue.main.async {
@@ -181,7 +240,10 @@ struct LoginPageView: View {
             }
 
             FirebaseService.shared.registerUser(
-                email: trimmedEmail,
+                firstName: trimmedFirstName,
+                lastName: trimmedLastName,
+                phone: phoneNumber,
+                email: trimmedSignupEmail,
                 password: password
             ) { result in
                 DispatchQueue.main.async {
@@ -189,7 +251,16 @@ struct LoginPageView: View {
 
                     switch result {
                     case .success:
-                        onLogin()
+                        successMessage = "Account created successfully. Please log in."
+                        selectedMode = .login
+                        identifier = trimmedSignupEmail
+                        password = ""
+                        confirmPassword = ""
+                        firstName = ""
+                        lastName = ""
+                        phoneNumber = ""
+                        signupEmail = ""
+
                     case .failure(let error):
                         errorMessage = error.localizedDescription
                     }
@@ -198,14 +269,24 @@ struct LoginPageView: View {
         }
     }
 
-    private func field(title: String, text: Binding<String>, placeholder: String, isEmail: Bool) -> some View {
+    private func clearMessages() {
+        errorMessage = ""
+        successMessage = ""
+    }
+
+    private func authField(
+        title: String,
+        placeholder: String,
+        text: Binding<String>,
+        kind: AuthFieldKind
+    ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            loginTextField(text: text, placeholder: placeholder, isEmail: isEmail)
+            authTextField(placeholder: placeholder, text: text, kind: kind)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(AppPalette.primaryText)
                 .padding(.horizontal, 16)
@@ -222,13 +303,38 @@ struct LoginPageView: View {
     }
 
     @ViewBuilder
-    private func loginTextField(text: Binding<String>, placeholder: String, isEmail: Bool) -> some View {
+    private func authTextField(
+        placeholder: String,
+        text: Binding<String>,
+        kind: AuthFieldKind
+    ) -> some View {
         #if os(iOS)
-        TextField(placeholder, text: text)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled(true)
-            .keyboardType(isEmail ? .emailAddress : .default)
-            .textContentType(isEmail ? .emailAddress : .none)
+        switch kind {
+        case .email:
+            TextField(placeholder, text: text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .keyboardType(.emailAddress)
+                .textContentType(.emailAddress)
+
+        case .phone:
+            TextField(placeholder, text: text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .keyboardType(.phonePad)
+                .textContentType(.telephoneNumber)
+
+        case .identifier:
+            TextField(placeholder, text: text)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled(true)
+                .keyboardType(.emailAddress)
+
+        case .name:
+            TextField(placeholder, text: text)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled(true)
+        }
         #else
         TextField(placeholder, text: text)
         #endif
@@ -268,6 +374,13 @@ struct LoginPageView: View {
         SecureField(placeholder, text: text)
         #endif
     }
+}
+
+enum AuthFieldKind {
+    case email
+    case phone
+    case identifier
+    case name
 }
 
 struct ForgotPasswordPageView: View {

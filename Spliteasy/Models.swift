@@ -103,6 +103,7 @@ struct BalanceItem: Identifiable, Hashable {
     var participantCount: Int
     var memberNames: [String]
     var expenses: [ExpenseEntry]
+    var isBlocked: Bool
 
     init(
         id: String,
@@ -112,7 +113,8 @@ struct BalanceItem: Identifiable, Hashable {
         direction: BalanceDirection,
         participantCount: Int = 2,
         memberNames: [String] = [],
-        expenses: [ExpenseEntry] = []
+        expenses: [ExpenseEntry] = [],
+        isBlocked: Bool = false
     ) {
         self.id = id
         self.kind = kind
@@ -122,6 +124,7 @@ struct BalanceItem: Identifiable, Hashable {
         self.participantCount = participantCount
         self.memberNames = memberNames
         self.expenses = expenses
+        self.isBlocked = isBlocked
     }
 
     var balanceText: String {
