@@ -28,7 +28,7 @@ struct AppUserProfile {
         self.profileImageURL = data["profileImageURL"] as? String ?? ""
         self.selectedAvatarIndex = data["selectedAvatarIndex"] as? Int ?? 0
         self.monthlyLimit = data["monthlyLimit"] as? Double ?? 0
-        self.themeMode = data["themeMode"] as? String ?? "auto"
+        self.themeMode = (data["themeMode"] as? String)?.lowercased() ?? "auto"
     }
 }
 
