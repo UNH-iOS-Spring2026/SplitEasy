@@ -55,7 +55,7 @@ struct RecentSelectionPageView: View {
                     .foregroundColor(AppPalette.primaryText)
             }
             .buttonStyle(.plain)
-            .padding(.top, -50)
+            .padding(.top, 5)
 
             Spacer()
 
@@ -68,7 +68,7 @@ struct RecentSelectionPageView: View {
 
             Color.clear.frame(width: 24, height: 24)
         }
-        .padding(.top, 6)
+        .padding(.top, 10)
     }
 
     private func recentSection(title: String, items: [BalanceItem]) -> some View {
@@ -137,7 +137,7 @@ struct RecentSelectionPageView: View {
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(AppPalette.secondaryText.opacity(0.7))
         }
-        .padding(.vertical, 12)
+        .padding(.vertical, 14)
     }
 
     private func avatarColor(for item: BalanceItem) -> Color {
