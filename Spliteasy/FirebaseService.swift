@@ -152,8 +152,8 @@ final class FirebaseService {
     private init() {}
 
     var currentUserId: String? {
-        auth.currentUser?.uid
-    }
+    return auth.currentUser?.uid
+}
 
     var currentUserEmail: String? {
         auth.currentUser?.email
