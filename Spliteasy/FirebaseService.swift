@@ -306,7 +306,7 @@ final class FirebaseService {
                 "phone": "",
                 "phoneDigits": "",
                 "profileImageURL": "",
-                "selectedAvatarIndex": 0,
+                "selectedAvatarIndex": 1,
                 "monthlyLimit": 1.0,
                 "themeMode": "auto",
                 "createdAt": FieldValue.serverTimestamp(),
