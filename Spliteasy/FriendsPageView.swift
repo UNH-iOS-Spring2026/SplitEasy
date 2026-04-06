@@ -1,5 +1,4 @@
 //
-//
 //  FriendsPageView.swift
 //  Spliteasy
 //
@@ -7,6 +6,7 @@
 //
 // Friends/groups overview page with search, filter, and summary information.
 //
+
 import SwiftUI
 
 struct FriendsPageView: View {
@@ -23,21 +23,37 @@ struct FriendsPageView: View {
 
     @State private var showFilterSheet = false
     @State private var searchText = ""
-    // Main screen layout
-
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerView(title: headerTitle)
+        FixedHeaderScrollContainer(headerHeight: 126) {
+            CurvedAppHeader(
+                title: "Friends",
+                subtitle: "Track friends and groups",
+                height: 126
+            ) {
+                Button {
+                    onSettleUpTap()
+                } label: {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.16))
+                            .frame(width: 42, height: 42)
 
-            searchBar
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(.white)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        } content: {
+            VStack(spacing: 0) {
+                searchBar
+                    .padding(.horizontal, 16)
 
-            summaryCard
-                .padding(.top, 10)
+                summaryCard
+                    .padding(.top, 12)
 
-            ScrollView(showsIndicators: false) {
                 VStack(spacing: 12) {
                     ForEach(filteredCurrentItems) { item in
                         Button {
@@ -61,18 +77,10 @@ struct FriendsPageView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.85), value: selectedSection)
             }
         }
-        .background(
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
         .sheet(isPresented: $showFilterSheet) {
             FilterPageView(selectedFilter: $selectedFilter)
         }
-        .onChange(of: selectedSection) {
+        .onChange(of: selectedSection) { _, _ in
             searchText = ""
         }
     }
@@ -107,38 +115,6 @@ struct FriendsPageView: View {
         String(format: "%.2f", value)
     }
 
-    private func headerView(title: String) -> some View {
-        HStack {
-            ThemeHeaderButton(showThemeMenu: $showThemeMenu)
-
-            Spacer()
-
-            Button {
-                onSettleUpTap()
-            } label: {
-                Text(title)
-                    .font(.system(size: 16, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(
-                            colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 20)
-        
-    }
-    // Search UI for quick filtering on the page
-
-
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
@@ -170,8 +146,6 @@ struct FriendsPageView: View {
                 .shadow(color: Color.black.opacity(0.07), radius: 8, x: 0, y: 4)
         )
     }
-    // Summary card shown near the top of the page
-
 
     private var summaryCard: some View {
         VStack(spacing: 0) {
@@ -259,38 +233,55 @@ struct FriendsPageView: View {
                     .padding(.top, 4)
 
                 ZStack {
-                    Rectangle()
-                        .fill(AppPalette.divider)
-                        .frame(height: 1)
+                    Capsule()
+                        .fill(Color.clear)
+                        .frame(height: 4)
 
-                    HStack {
-                        Rectangle()
-                            .fill(selectedSection == type ? AppPalette.accentMid : Color.clear)
-                            .frame(height: 3)
-                            .frame(maxWidth: .infinity)
+                    if selectedSection == type {
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .frame(height: 4)
+                            .matchedGeometryEffect(id: "friends_section_indicator", in: friendsSectionNamespace)
                     }
                 }
+                .frame(height: 6)
             }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    private func balancePill(text: String, bg: Color, textColor: Color, icon: String) -> some View {
-        HStack(spacing: 7) {
+    @Namespace private var friendsSectionNamespace
+
+    private func balancePill(
+        text: String,
+        bg: Color,
+        textColor: Color,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 8) {
             Image(systemName: icon)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 13, weight: .bold))
 
             Text(text)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 14, weight: .bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.85)
+                .minimumScaleFactor(0.8)
         }
         .foregroundColor(textColor)
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(bg)
         )
     }

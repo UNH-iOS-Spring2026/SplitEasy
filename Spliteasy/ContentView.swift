@@ -3,15 +3,24 @@
 //
 //  Created by SIDHARTHA JAVVADI on 3/4/26.
 //
+// Main entry screen after login.
+// This file controls:
+// - onboarding / auth entry
+// - tab navigation
+// - page switching
+// - Firebase data loading
 //
-// Main entry screen after login. This file controls tab navigation,
-// page switching, and loading data from Firebase.
-//
+
 import SwiftUI
 import FirebaseAuth
 
+enum AuthEntryScreen {
+    case welcome
+    case login
+    case signup
+}
+
 struct ContentView: View {
-    // A lot of navigation state is kept here because this is the app shell.
     @State private var selectedTab: Tab = .home
     @State private var selectedSection: FriendsSection = .friends
     @State private var showPlusMenu = false
@@ -36,14 +45,18 @@ struct ContentView: View {
     @State private var recentNotifications: [AppNotificationItem] = []
 
     @State private var selectedFriendDetail: BalanceItem?
+    @State private var selectedGroupDetail: BalanceItem?
     @State private var selectedExpenseTarget: BalanceItem?
     @State private var selectedSettleTarget: BalanceItem?
+
+    @State private var showGroupDetailPage = false
+    @State private var addExpenseReturnToGroupDetail = false
 
     @State private var friendsData: [BalanceItem] = []
     @State private var groupsData: [BalanceItem] = []
     @State private var activityTransactions: [TransactionItem] = []
-    // Main screen layout
 
+    @State private var authEntryScreen: AuthEntryScreen = .welcome
 
     var body: some View {
         ZStack(alignment: .leading) {
@@ -52,14 +65,63 @@ struct ContentView: View {
             } else if isLoggedIn {
                 mainAppView
             } else {
-                LoginPageView {
-                    handleSuccessfulAuth()
-                }
+                authEntryView
             }
         }
         .preferredColorScheme(resolvedColorScheme)
         .onAppear {
             checkExistingSession()
+        }
+    }
+
+    private var authEntryView: some View {
+        Group {
+            switch authEntryScreen {
+            case .welcome:
+                WelcomeOnboardingView(
+                    onGetStarted: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            authEntryScreen = .signup
+                        }
+                    },
+                    onLogin: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            authEntryScreen = .login
+                        }
+                    },
+                    onSkip: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            authEntryScreen = .login
+                        }
+                    }
+                )
+
+            case .login:
+                LoginPageView(
+                    initialMode: .login,
+                    onLogin: {
+                        handleSuccessfulAuth()
+                    },
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            authEntryScreen = .welcome
+                        }
+                    }
+                )
+
+            case .signup:
+                LoginPageView(
+                    initialMode: .signup,
+                    onLogin: {
+                        handleSuccessfulAuth()
+                    },
+                    onBack: {
+                        withAnimation(.easeInOut(duration: 0.25)) {
+                            authEntryScreen = .welcome
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -144,6 +206,20 @@ struct ContentView: View {
                         onToggleBlock: toggleBlockStatus,
                         onRemoveFriend: removeFriend
                     )
+                } else if showGroupDetailPage, let group = selectedGroupDetail {
+                    GroupDetailPageView(
+                        group: latestGroupVersion(for: group),
+                        selectedTab: $selectedTab,
+                        showGroupDetailPage: $showGroupDetailPage,
+                        onAddExpense: { item in
+                            addExpenseReturnToGroupDetail = true
+                            openExpensePage(for: item)
+                        },
+                        onRefresh: {
+                            loadGroupHistory(groupId: group.id)
+                            loadGroupsFromFirestore()
+                        }
+                    )
                 } else if showAddFriendPage {
                     AddFriendPageView(
                         selectedTab: $selectedTab,
@@ -173,6 +249,7 @@ struct ContentView: View {
                     case .home:
                         HomePageView(
                             friendsData: filteredFriends,
+                            userName: profileName,
                             headerTitle: "Settle Up",
                             selectedFilter: $selectedFilter,
                             monthlyLimit: monthlyLimit,
@@ -185,7 +262,13 @@ struct ContentView: View {
                                 selectedTab = .home
                             },
                             showThemeMenu: $showThemeMenu,
-                            onSaveMonthlyLimit: saveMonthlyLimit
+                            onSaveMonthlyLimit: saveMonthlyLimit,
+                            onRefresh: {
+                                loadFriendsFromFirestore()
+                                loadGroupsFromFirestore()
+                                loadActivityFromFirestore()
+                                loadNotificationsFromFirestore()
+                            }
                         )
 
                     case .friends:
@@ -201,7 +284,7 @@ struct ContentView: View {
                                 if item.kind == .friend {
                                     openFriendDetailPage(for: item)
                                 } else {
-                                    openExpensePage(for: item)
+                                    openGroupDetailPage(for: item)
                                 }
                             },
                             onSettleUpTap: {
@@ -244,6 +327,7 @@ struct ContentView: View {
                             onSaveExpense: saveExpense,
                             onAddMembersToGroup: addMembersToGroup,
                             onDeleteGroup: deleteGroup,
+                            onBack: handleAddExpenseBack,
                             selectedTab: $selectedTab
                         )
                     }
@@ -270,6 +354,7 @@ struct ContentView: View {
             if !showCreateGroupPage &&
                 !showAddFriendPage &&
                 !showFriendDetailPage &&
+                !showGroupDetailPage &&
                 !showSettleUpSelectionPage &&
                 !showSettleUpPage {
                 CustomBottomBar(
@@ -277,7 +362,7 @@ struct ContentView: View {
                     selectedSection: selectedSection,
                     showActionButton: selectedTab == .friends && !showExpenseSelectionPage && !showCreateGroupPage && !showAddFriendPage,
                     showPlusMenu: $showPlusMenu,
-                    hidePlusButton: selectedTab == .activity || selectedTab == .profile || selectedTab == .add || showExpenseSelectionPage || showCreateGroupPage || showAddFriendPage || showFriendDetailPage || showSettleUpSelectionPage || showSettleUpPage,
+                    hidePlusButton: selectedTab == .activity || selectedTab == .profile || selectedTab == .add || showExpenseSelectionPage || showCreateGroupPage || showAddFriendPage || showFriendDetailPage || showGroupDetailPage || showSettleUpSelectionPage || showSettleUpPage,
                     actionButtonPressed: handleFriendsActionButtonTap,
                     addExpensePressed: handleAddExpense
                 )
@@ -294,6 +379,7 @@ struct ContentView: View {
                 showCreateGroupPage = false
                 showAddFriendPage = false
                 showFriendDetailPage = false
+                showGroupDetailPage = false
             }
 
             if selectedTab != .add {
@@ -318,8 +404,6 @@ struct ContentView: View {
             return (hour >= 6 && hour < 18) ? .light : .dark
         }
     }
-    // When the app opens, check if Firebase still has an active session.
-
 
     private func checkExistingSession() {
         if FirebaseService.shared.currentUserId != nil {
@@ -327,10 +411,9 @@ struct ContentView: View {
         } else {
             isLoggedIn = false
             isCheckingSession = false
+            authEntryScreen = .welcome
         }
     }
-    // After login/signup, load the user profile and app data.
-
 
     private func handleSuccessfulAuth() {
         FirebaseService.shared.fetchCurrentUserProfile { result in
@@ -367,8 +450,6 @@ struct ContentView: View {
             }
         }
     }
-    // Pull latest friend records and map them into app models.
-
 
     private func loadFriendsFromFirestore() {
         FirebaseService.shared.fetchFriends { result in
@@ -380,6 +461,7 @@ struct ContentView: View {
                     friendsData = records.map { record in
                         let existingFriend = previousFriends.first(where: { $0.id == record.documentId })
                         let preservedHistory = (existingFriend?.expenses ?? []).filter { $0.dateText != "Contact" }
+
                         let contactExpense: [ExpenseEntry] = record.friendContact.isEmpty ? [] : [
                             ExpenseEntry(
                                 id: "contact-\(record.documentId)",
@@ -416,16 +498,18 @@ struct ContentView: View {
             }
         }
     }
-    // Pull latest group records and map them into app models.
 
-
-    private func loadGroupsFromFirestore() {
+    private func loadGroupsFromFirestore(completion: (() -> Void)? = nil) {
         FirebaseService.shared.fetchGroups { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let records):
+                    let previousGroups = groupsData
+
                     groupsData = records.map { record in
-                        BalanceItem(
+                        let existingGroup = previousGroups.first(where: { $0.id == record.documentId })
+
+                        return BalanceItem(
                             id: record.documentId,
                             kind: .group,
                             name: record.name,
@@ -433,7 +517,7 @@ struct ContentView: View {
                             direction: record.balanceDirection == "youOwe" ? .youOwe : .owesYou,
                             participantCount: max(record.participantCount, 1),
                             memberNames: record.memberNames,
-                            expenses: [],
+                            expenses: existingGroup?.expenses ?? [],
                             isBlocked: false
                         )
                     }
@@ -442,8 +526,15 @@ struct ContentView: View {
                         self.selectedExpenseTarget = groupsData.first(where: { $0.id == selectedExpenseTarget.id })
                     }
 
+                    if let selectedGroupDetail {
+                        self.selectedGroupDetail = groupsData.first(where: { $0.id == selectedGroupDetail.id })
+                    }
+
+                    completion?()
+
                 case .failure:
                     groupsData = []
+                    completion?()
                 }
             }
         }
@@ -554,6 +645,10 @@ struct ContentView: View {
                         selectedExpenseTarget = groupsData[index]
                     }
 
+                    if selectedGroupDetail?.id == groupId {
+                        selectedGroupDetail = groupsData[index]
+                    }
+
                 case .failure(let error):
                     print("❌ fetchGroupHistory failed: \(error.localizedDescription)")
                 }
@@ -632,6 +727,10 @@ struct ContentView: View {
         friendsData.first(where: { $0.id == friend.id }) ?? friend
     }
 
+    private func latestGroupVersion(for group: BalanceItem) -> BalanceItem {
+        groupsData.first(where: { $0.id == group.id }) ?? group
+    }
+
     private func openFriendDetailPage(for item: BalanceItem) {
         selectedFriendDetail = latestFriendVersion(for: item)
         loadFriendHistory(friendId: item.id)
@@ -642,10 +741,24 @@ struct ContentView: View {
         selectedSection = .friends
     }
 
+    private func openGroupDetailPage(for item: BalanceItem) {
+        guard item.kind == .group else { return }
+
+        selectedGroupDetail = latestGroupVersion(for: item)
+        loadGroupHistory(groupId: item.id)
+        showGroupDetailPage = true
+        showFriendDetailPage = false
+        showSettleUpSelectionPage = false
+        showSettleUpPage = false
+        showExpenseSelectionPage = false
+        selectedTab = .friends
+        selectedSection = .groups
+    }
+
     private func openExpensePage(for item: BalanceItem) {
         if item.kind == .friend && item.isBlocked { return }
 
-        selectedExpenseTarget = item.kind == .friend ? latestFriendVersion(for: item) : item
+        selectedExpenseTarget = item.kind == .friend ? latestFriendVersion(for: item) : latestGroupVersion(for: item)
 
         if item.kind == .group {
             loadGroupHistory(groupId: item.id)
@@ -655,12 +768,29 @@ struct ContentView: View {
 
         showExpenseSelectionPage = false
         showFriendDetailPage = false
+        showGroupDetailPage = false
         showSettleUpSelectionPage = false
         showSettleUpPage = false
         showCreateGroupPage = false
         showAddFriendPage = false
         selectedTab = .add
         selectedSection = item.kind == .group ? .groups : .friends
+    }
+
+    private func handleAddExpenseBack() {
+        if addExpenseReturnToGroupDetail, let group = selectedExpenseTarget, group.kind == .group {
+            selectedGroupDetail = latestGroupVersion(for: group)
+            loadGroupHistory(groupId: group.id)
+            showGroupDetailPage = true
+            showFriendDetailPage = false
+            showExpenseSelectionPage = false
+            selectedTab = .friends
+            selectedSection = .groups
+        } else {
+            selectedTab = .friends
+        }
+
+        addExpenseReturnToGroupDetail = false
     }
 
     private func handleSettleUpBack() {
@@ -775,6 +905,11 @@ struct ContentView: View {
                         selectedExpenseTarget = nil
                     }
 
+                    if selectedGroupDetail?.id == group.id {
+                        selectedGroupDetail = nil
+                        showGroupDetailPage = false
+                    }
+
                     loadGroupsFromFirestore()
                     loadActivityFromFirestore()
 
@@ -837,8 +972,6 @@ struct ContentView: View {
             }
         }
     }
-    // Decides whether the new expense belongs to a friend or a group.
-
 
     private func saveExpense(
         itemID: String,
@@ -945,10 +1078,11 @@ struct ContentView: View {
                 DispatchQueue.main.async {
                     switch result {
                     case .success:
-                        loadGroupsFromFirestore()
+                        loadGroupsFromFirestore {
+                            loadGroupHistory(groupId: itemID)
+                        }
                         loadFriendsFromFirestore()
                         loadActivityFromFirestore()
-                        loadGroupHistory(groupId: itemID)
 
                         FirebaseService.shared.saveNotification(
                             title: "Group expense added",
@@ -957,8 +1091,18 @@ struct ContentView: View {
                             loadNotificationsFromFirestore()
                         }
 
+                        if let updatedGroup = groupsData.first(where: { $0.id == itemID }) {
+                            selectedGroupDetail = updatedGroup
+                        } else {
+                            selectedGroupDetail = latestGroupVersion(for: group)
+                        }
+
+                        showGroupDetailPage = true
+                        showFriendDetailPage = false
+                        showExpenseSelectionPage = false
                         selectedSection = .groups
                         selectedTab = .friends
+                        addExpenseReturnToGroupDetail = false
 
                     case .failure(let error):
                         print("❌ saveGroupExpenseAndUpdateFriends failed: \(error.localizedDescription)")
@@ -1138,8 +1282,11 @@ struct ContentView: View {
     private func signOut() {
         do {
             try FirebaseService.shared.auth.signOut()
+
             isLoggedIn = false
             isCheckingSession = false
+            authEntryScreen = .welcome
+
             selectedTab = .home
             selectedSection = .friends
             showPlusMenu = false
@@ -1147,12 +1294,23 @@ struct ContentView: View {
             showCreateGroupPage = false
             showAddFriendPage = false
             showFriendDetailPage = false
+            showGroupDetailPage = false
             showSettleUpSelectionPage = false
             showSettleUpPage = false
             settleUpReturnToFriendDetail = false
+            addExpenseReturnToGroupDetail = false
+
             selectedFriendDetail = nil
+            selectedGroupDetail = nil
             selectedExpenseTarget = nil
             selectedSettleTarget = nil
+
+            profileName = ""
+            profileEmail = ""
+            profilePhone = ""
+            monthlyLimit = 0
+            savedThemeMode = AppThemeMode.auto.rawValue
+
             friendsData = []
             groupsData = []
             activityTransactions = []

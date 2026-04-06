@@ -4,24 +4,29 @@
 //
 //  Created by SIDHARTHA JAVVADI on 3/24/26.
 //
-// This page shows expense activity and simple charts for category/month view.
-//
+
 import SwiftUI
 
 struct ActivityPageView: View {
     let transactions: [TransactionItem]
     @Binding var showThemeMenu: Bool
-    @State private var selectedChart: ActivityChartType = .category
-    // Main screen layout
+    var onRefresh: (() async -> Void)? = nil
 
+    @State private var selectedChart: ActivityChartType = .category
 
     var body: some View {
-        GeometryReader { geo in
+        FixedHeaderScrollContainer(headerHeight: 126) {
+            CurvedAppHeader(
+                title: "Activity",
+                subtitle: "All your transactions",
+                height: 126
+            ) {
+                Color.clear.frame(width: 42, height: 42)
+            }
+        } content: {
             VStack(spacing: 0) {
-                headerSection
-
                 chartCard
-                    .padding(.top, 16)
+                    .padding(.top, 14)
                     .padding(.horizontal, 20)
 
                 Text("Recent Transactions")
@@ -31,54 +36,16 @@ struct ActivityPageView: View {
                     .padding(.top, 16)
                     .padding(.horizontal, 20)
 
-                ScrollView(.vertical, showsIndicators: true) {
-                    VStack(spacing: 0) {
-                        ForEach(transactions) { transaction in
-                            ActivityTransactionRow(item: transaction)
-                        }
+                VStack(spacing: 0) {
+                    ForEach(transactions) { transaction in
+                        ActivityTransactionRow(item: transaction)
                     }
-                    .padding(.top, 8)
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 24)
                 }
-                .frame(maxHeight: .infinity)
-            }
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
-            .background(
-                LinearGradient(
-                    colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
-        }
-    }
-    // Top bar / page heading
-
-
-    private var headerSection: some View {
-        VStack(alignment: .trailing, spacing: 6) {
-            HStack(alignment: .top) {
-                ThemeHeaderButton(showThemeMenu: $showThemeMenu)
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 6) {
-                    Text("Activity")
-                        .font(.system(size: 28, weight: .bold))
-                        .italic()
-                        .foregroundColor(AppPalette.primaryText)
-
-                    Text("All your transactions")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(AppPalette.secondaryText)
-                }
+                .padding(.top, 8)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.horizontal, 20)
-        
     }
 
     private var chartCard: some View {
@@ -376,68 +343,9 @@ struct ModernDonutChartView: View {
     }
 }
 
-struct ActivityTransactionRow: View {
-    let item: TransactionItem
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(AppPalette.rowIconBg)
-                        .frame(width: 56, height: 56)
-
-                    Image(systemName: iconName(for: item.category))
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(AppPalette.accentMid)
-                }
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(item.title)
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                        .lineLimit(1)
-
-                    Text(item.subtitle)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppPalette.secondaryText)
-                        .lineLimit(1)
-                }
-
-                Spacer(minLength: 6)
-
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(String(format: "$%.2f", item.amount))
-                        .font(.system(size: 15, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-
-                    Text(item.date)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(AppPalette.secondaryText)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 12)
-
-            Divider()
-                .background(AppPalette.divider)
-        }
-    }
-
-    private func iconName(for category: String) -> String {
-        switch category {
-        case "Food": return "fork.knife"
-        case "Transport": return "car.fill"
-        case "Shopping": return "bag.fill"
-        case "Travel": return "airplane"
-        default: return "receipt"
-        }
-    }
-}
-
 struct ActivityDonutSlice: Shape {
-    var startAngle: Angle
-    var endAngle: Angle
+    let startAngle: Angle
+    let endAngle: Angle
 
     func path(in rect: CGRect) -> Path {
         let radius = min(rect.width, rect.height) / 2
@@ -446,11 +354,60 @@ struct ActivityDonutSlice: Shape {
         var path = Path()
         path.addArc(
             center: center,
-            radius: radius - 14,
+            radius: radius,
             startAngle: startAngle,
             endAngle: endAngle,
             clockwise: false
         )
         return path
+    }
+}
+
+struct ActivityTransactionRow: View {
+    let item: TransactionItem
+
+    var body: some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(AppPalette.rowIconBg)
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: iconName)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundColor(AppPalette.accentMid)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Text("\(item.subtitle) • \(item.date)")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+
+            Spacer()
+
+            Text("$\(String(format: "%.2f", item.amount))")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(AppPalette.primaryText)
+        }
+        .padding(.vertical, 12)
+    }
+
+    private var iconName: String {
+        switch item.category.lowercased() {
+        case "food":
+            return "fork.knife"
+        case "transport":
+            return "car.fill"
+        case "shopping":
+            return "bag.fill"
+        case "travel":
+            return "airplane"
+        default:
+            return "receipt"
+        }
     }
 }

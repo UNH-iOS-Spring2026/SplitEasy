@@ -3,19 +3,33 @@
 //  Spliteasy
 //
 //  Created by SIDHARTHA JAVVADI on 3/24/26.
-
-
-// This screen handles profile details, feedback, support, notifications,
-// and password reset UI. I kept the original logic the same and only added
-// comments / small readability improvements.
 //
+
 import SwiftUI
 #if os(iOS)
 import UIKit
 #endif
 
+private enum AccountKeyboardKind {
+    case standard
+    case email
+    case phone
+
+    #if os(iOS)
+    var uiKeyboardType: UIKeyboardType {
+        switch self {
+        case .standard:
+            return .default
+        case .email:
+            return .emailAddress
+        case .phone:
+            return .phonePad
+        }
+    }
+    #endif
+}
+
 struct AccountPageView: View {
-    // Profile-related UI is grouped in one file to keep the account tab simple.
     @Binding var showThemeMenu: Bool
     @Binding var profileName: String
     @Binding var profileEmail: String
@@ -59,46 +73,26 @@ struct AccountPageView: View {
     @State private var resetPasswordMessage = ""
     @State private var resetPasswordMessageColor: Color = .green.opacity(0.85)
     @State private var isUpdatingPassword = false
-    // Main screen layout
-
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                fixedHeaderView
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                    .padding(.bottom, 12)
-                    .background(
-                        LinearGradient(
-                            colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
-                    .zIndex(10)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(spacing: 18) {
-                        profileCard
-                        accountFieldsCard
-                        quickActionsCard
-                        supportActionsCard
-                        signOutButton
-
-                        Spacer(minLength: 120)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 30)
-                }
+        FixedHeaderScrollContainer(headerHeight: 126) {
+            CurvedAppHeader(
+                title: "Account",
+                subtitle: "Manage your profile",
+                height: 126
+            ) {
+                ThemeHeaderButton(showThemeMenu: $showThemeMenu)
             }
+        } content: {
+            VStack(spacing: 18) {
+                profileCard
+                accountFieldsCard
+                quickActionsCard
+                supportActionsCard
+                signOutButton
+                Spacer(minLength: 120)
+            }
+            .padding(.horizontal, 20)
         }
         .onAppear {
             syncFromBindings()
@@ -139,23 +133,6 @@ struct AccountPageView: View {
             clearProfileMessage()
         }
     }
-
-    private var fixedHeaderView: some View {
-        HStack {
-            ThemeHeaderButton(showThemeMenu: $showThemeMenu)
-                
-
-            Spacer()
-
-            Text("Account")
-                .font(.system(size: 28, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-                
-        }
-    }
-    // Profile image + nickname area
-
 
     private var profileCard: some View {
         VStack(spacing: 12) {
@@ -227,8 +204,6 @@ struct AccountPageView: View {
         return "Profile image upload is available on iOS"
         #endif
     }
-    // Editable profile fields section
-
 
     private var accountFieldsCard: some View {
         VStack(spacing: 16) {
@@ -333,8 +308,6 @@ struct AccountPageView: View {
         TextField(placeholder, text: text)
         #endif
     }
-    // Shortcuts like notifications and feedback
-
 
     private var quickActionsCard: some View {
         VStack(spacing: 12) {
@@ -868,38 +841,26 @@ struct AccountPageView: View {
                     profileEmail = emailText
                     profilePhone = phoneText
 
-                    profileMessage = "Profile saved successfully."
+                    profileMessage = "Profile updated successfully."
                     profileMessageColor = .green.opacity(0.85)
 
-                case .failure:
-                    profileName = trimmedNickname
-                    profileEmail = trimmedEmail
-                    profilePhone = trimmedPhone
-                    nicknameText = trimmedNickname
-
-                    profileMessage = "Profile saved successfully."
-                    profileMessageColor = .green.opacity(0.85)
+                case .failure(let error):
+                    profileMessage = error.localizedDescription
+                    profileMessageColor = .red.opacity(0.85)
                 }
             }
         }
     }
 
     private func updatePassword() {
-        resetPasswordMessage = ""
-
-        guard newPassword == reenteredPassword else {
-            resetPasswordMessage = "New password and re-entered password do not match."
-            resetPasswordMessageColor = .red.opacity(0.85)
-            return
-        }
-
-        guard newPassword.count >= 6 else {
-            resetPasswordMessage = "New password must be at least 6 characters."
+        guard canUpdatePassword else {
+            resetPasswordMessage = "Please complete all fields correctly."
             resetPasswordMessageColor = .red.opacity(0.85)
             return
         }
 
         isUpdatingPassword = true
+        resetPasswordMessage = ""
 
         onResetPassword(currentPassword, newPassword) { result in
             DispatchQueue.main.async {
@@ -921,47 +882,14 @@ struct AccountPageView: View {
         }
     }
 
+    private func formattedPhone(_ value: String) -> String {
+        let digits = FirebaseService.normalizedPhoneDigits(value)
+        return FirebaseService.formattedPhoneNumber(from: digits)
+    }
+
     private func clearProfileMessage() {
         if !isSavingProfile && !isUploadingProfileImage {
             profileMessage = ""
         }
     }
-
-    private func formattedPhone(_ input: String) -> String {
-        let digits = input.filter(\.isNumber)
-        let limited = String(digits.prefix(10))
-
-        if limited.isEmpty { return "" }
-        if limited.count < 4 { return limited }
-
-        if limited.count < 7 {
-            let first = limited.prefix(3)
-            let second = limited.dropFirst(3)
-            return "(\(first)) \(second)"
-        }
-
-        let area = limited.prefix(3)
-        let middle = limited.dropFirst(3).prefix(3)
-        let last = limited.dropFirst(6)
-        return "(\(area)) \(middle)-\(last)"
-    }
-}
-
-enum AccountKeyboardKind {
-    case standard
-    case email
-    case phone
-
-    #if os(iOS)
-    var uiKeyboardType: UIKeyboardType {
-        switch self {
-        case .standard:
-            return .default
-        case .email:
-            return .emailAddress
-        case .phone:
-            return .phonePad
-        }
-    }
-    #endif
 }

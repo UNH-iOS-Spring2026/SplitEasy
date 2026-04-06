@@ -1,4 +1,3 @@
-//
 // Login and signup page with forgot password support.
 //
 //
@@ -17,8 +16,7 @@ struct LoginPageView: View {
         case signup = "Create Account"
     }
 
-    @State private var selectedMode: AuthMode = .login
-
+    @State private var selectedMode: AuthMode
     @State private var firstName: String = ""
     @State private var lastName: String = ""
     @State private var phoneNumber: String = ""
@@ -33,8 +31,17 @@ struct LoginPageView: View {
     @State private var successMessage = ""
 
     let onLogin: () -> Void
-    // Main screen layout
+    let onBack: (() -> Void)?
 
+    init(
+        initialMode: AuthMode = .login,
+        onLogin: @escaping () -> Void,
+        onBack: (() -> Void)? = nil
+    ) {
+        self._selectedMode = State(initialValue: initialMode)
+        self.onLogin = onLogin
+        self.onBack = onBack
+    }
 
     var body: some View {
         ZStack {
@@ -45,7 +52,11 @@ struct LoginPageView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 22) {
+            VStack(spacing: 0) {
+                headerBar
+                    .padding(.horizontal, 24)
+                    .padding(.top, 10)
+
                 Spacer()
 
                 VStack(spacing: 10) {
@@ -65,6 +76,7 @@ struct LoginPageView: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 24)
+                .padding(.top, 26)
 
                 VStack(spacing: 16) {
                     if selectedMode == .signup {
@@ -127,6 +139,7 @@ struct LoginPageView: View {
                     }
                 }
                 .padding(.horizontal, 24)
+                .padding(.top, 24)
 
                 Button {
                     handlePrimaryAction()
@@ -156,6 +169,7 @@ struct LoginPageView: View {
                 }
                 .buttonStyle(.plain)
                 .padding(.horizontal, 24)
+                .padding(.top, 26)
                 .disabled(isLoading || !canSubmit)
                 .opacity((isLoading || !canSubmit) ? 0.65 : 1.0)
 
@@ -177,6 +191,35 @@ struct LoginPageView: View {
             if formatted != newValue {
                 phoneNumber = formatted
             }
+        }
+    }
+
+    private var headerBar: some View {
+        HStack {
+            if let onBack {
+                Button {
+                    onBack()
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(AppPalette.card)
+                            .frame(width: 46, height: 46)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(AppPalette.border, lineWidth: 1)
+                            )
+
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(AppPalette.primaryText)
+                    }
+                }
+                .buttonStyle(.plain)
+            } else {
+                Color.clear.frame(width: 46, height: 46)
+            }
+
+            Spacer()
         }
     }
 
@@ -479,31 +522,44 @@ struct ForgotPasswordPageView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.horizontal, 24)
-                    .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading)
-                    .opacity(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isLoading ? 0.65 : 1.0)
-
-                    if showConfirmation {
-                        VStack(spacing: 8) {
-                            Image(systemName: "envelope.badge")
-                                .font(.system(size: 28, weight: .semibold))
-                                .foregroundColor(AppPalette.accentMid)
-
-                            Text("Reset link sent")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(AppPalette.primaryText)
-
-                            Text("A password reset email has been sent.")
-                                .font(.system(size: 14, weight: .medium))
-                                .foregroundColor(AppPalette.secondaryText)
-                                .multilineTextAlignment(.center)
-                        }
-                        .padding(.horizontal, 30)
-                        .padding(.top, 10)
-                    }
+                    .disabled(isLoading || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .opacity((isLoading || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ? 0.65 : 1)
 
                     Spacer()
                 }
             }
+        }
+        .alert("Reset Link Sent", isPresented: $showConfirmation) {
+            Button("OK") {
+                dismiss()
+            }
+        } message: {
+            Text("A password reset link has been sent to your email.")
+        }
+    }
+
+    private var headerView: some View {
+        HStack {
+            Button {
+                dismiss()
+            } label: {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(AppPalette.card)
+                        .frame(width: 46, height: 46)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .stroke(AppPalette.border, lineWidth: 1)
+                        )
+
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(AppPalette.primaryText)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
         }
     }
 
@@ -514,17 +570,17 @@ struct ForgotPasswordPageView: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled(true)
             .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
         #else
         TextField("Enter email", text: $email)
         #endif
     }
 
     private func sendResetLink() {
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        errorMessage = ""
-        showConfirmation = false
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmedEmail.isEmpty else { return }
+
         isLoading = true
+        errorMessage = ""
 
         FirebaseService.shared.sendPasswordReset(email: trimmedEmail) { result in
             DispatchQueue.main.async {
@@ -537,39 +593,6 @@ struct ForgotPasswordPageView: View {
                     errorMessage = error.localizedDescription
                 }
             }
-        }
-    }
-    // Top bar / page heading
-
-
-    private var headerView: some View {
-        HStack {
-            Button {
-                dismiss()
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            Text("Forgot Password")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Color.clear.frame(width: 46, height: 46)
         }
     }
 }

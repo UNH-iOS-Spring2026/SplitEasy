@@ -1,16 +1,15 @@
 //
-//
 //  HomePageView.swift
 //  Spliteasy
 //
 //  Created by SIDHARTHA JAVVADI on 3/24/26.
 //
-// Home screen with monthly limit summary and quick access to friend balances.
-//
+
 import SwiftUI
 
 struct HomePageView: View {
     let friendsData: [BalanceItem]
+    let userName: String
     let headerTitle: String
     @Binding var selectedFilter: BalanceFilter
     let monthlyLimit: Double
@@ -19,61 +18,107 @@ struct HomePageView: View {
     let onSettleUpTap: () -> Void
     @Binding var showThemeMenu: Bool
     let onSaveMonthlyLimit: (Double) -> Void
+    let onRefresh: (() async -> Void)?
 
     @State private var showFilterSheet = false
     @State private var showMonthlyLimitSheet = false
+    @State private var goToNotifications = false
     @State private var searchText = ""
-    // Main screen layout
 
+    init(
+        friendsData: [BalanceItem],
+        userName: String,
+        headerTitle: String,
+        selectedFilter: Binding<BalanceFilter>,
+        monthlyLimit: Double,
+        monthlySpent: Double,
+        onSelectItem: @escaping (BalanceItem) -> Void,
+        onSettleUpTap: @escaping () -> Void,
+        showThemeMenu: Binding<Bool>,
+        onSaveMonthlyLimit: @escaping (Double) -> Void,
+        onRefresh: (() async -> Void)? = nil
+    ) {
+        self.friendsData = friendsData
+        self.userName = userName
+        self.headerTitle = headerTitle
+        self._selectedFilter = selectedFilter
+        self.monthlyLimit = monthlyLimit
+        self.monthlySpent = monthlySpent
+        self.onSelectItem = onSelectItem
+        self.onSettleUpTap = onSettleUpTap
+        self._showThemeMenu = showThemeMenu
+        self.onSaveMonthlyLimit = onSaveMonthlyLimit
+        self.onRefresh = onRefresh
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerView(title: headerTitle)
+        NavigationStack {
+            FixedHeaderScrollContainer(
+                headerHeight: 118,
+                onRefresh: onRefresh
+            ) {
+                CurvedAppHeader(
+                    title: welcomeTitle,
+                    subtitle: "Track balances and monthly spending",
+                    height: 118
+                ) {
+                    Button {
+                        goToNotifications = true
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Circle()
+                                .fill(Color.white.opacity(0.14))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
 
-            searchBar
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                            Image(systemName: "bell")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(.white)
 
-            monthlyLimitCard
-                .padding(.top, 10)
-
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 12) {
-                    ForEach(filteredSearchFriends) { item in
-                        Button {
-                            onSelectItem(item)
-                        } label: {
-                            HomeBalanceRow(item: item)
+                            Circle()
+                                .fill(Color(red: 0.67, green: 0.90, blue: 0.73))
+                                .frame(width: 11, height: 11)
+                                .offset(x: 2, y: -1)
                         }
-                        .buttonStyle(.plain)
                     }
-
-                    Spacer(minLength: 180)
+                    .buttonStyle(.plain)
                 }
-                .padding(.top, 12)
-                .padding(.horizontal, 14)
+            } content: {
+                VStack(spacing: 0) {
+                    searchBar
+                        .padding(.top, 8)
+
+                    monthlyLimitCard
+                        .padding(.top, 12)
+
+                    balancesSection
+                        .padding(.top, 14)
+                }
+            }
+            .navigationDestination(isPresented: $goToNotifications) {
+                NotificationPageView()
+            }
+            .sheet(isPresented: $showFilterSheet) {
+                FilterPageView(selectedFilter: $selectedFilter)
+            }
+            .sheet(isPresented: $showMonthlyLimitSheet) {
+                MonthlyLimitSheet(
+                    currentLimit: monthlyLimit,
+                    onSave: { newLimit in
+                        onSaveMonthlyLimit(newLimit)
+                        showMonthlyLimitSheet = false
+                    }
+                )
             }
         }
-        .background(
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
-        .sheet(isPresented: $showFilterSheet) {
-            FilterPageView(selectedFilter: $selectedFilter)
-        }
-        .sheet(isPresented: $showMonthlyLimitSheet) {
-            MonthlyLimitSheet(
-                currentLimit: monthlyLimit,
-                onSave: { newLimit in
-                    onSaveMonthlyLimit(newLimit)
-                    showMonthlyLimitSheet = false
-                }
-            )
-        }
+    }
+
+    private var welcomeTitle: String {
+        let trimmed = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "Welcome" : "Welcome \(trimmed)"
     }
 
     private var filteredSearchFriends: [BalanceItem] {
@@ -105,38 +150,6 @@ struct HomePageView: View {
         String(format: "%.2f", value)
     }
 
-    private func headerView(title: String) -> some View {
-        HStack {
-            ThemeHeaderButton(showThemeMenu: $showThemeMenu)
-
-            Spacer()
-
-            Button {
-                onSettleUpTap()
-            } label: {
-                Text(title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(
-                        LinearGradient(
-                            colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.horizontal, 20)
-        
-    }
-    // Search UI for quick filtering on the page
-
-
     private var searchBar: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
@@ -157,19 +170,18 @@ struct HomePageView: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 13)
         .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(AppPalette.searchField)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .stroke(AppPalette.border, lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.07), radius: 8, x: 0, y: 4)
+                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
         )
+        .padding(.horizontal, 16)
     }
-    // Monthly budget / limit summary card
-
 
     private var monthlyLimitCard: some View {
         VStack(spacing: 0) {
@@ -195,9 +207,9 @@ struct HomePageView: View {
                         showMonthlyLimitSheet = true
                     } label: {
                         Image(systemName: "square.and.pencil")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 21, weight: .semibold))
                             .foregroundColor(AppPalette.accentMid)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 42, height: 42)
                     }
                     .buttonStyle(.plain)
 
@@ -205,9 +217,9 @@ struct HomePageView: View {
                         showFilterSheet = true
                     } label: {
                         Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 22, weight: .semibold))
+                            .font(.system(size: 21, weight: .semibold))
                             .foregroundColor(selectedFilter.tintColor)
-                            .frame(width: 44, height: 44)
+                            .frame(width: 42, height: 42)
                     }
                     .buttonStyle(.plain)
                 }
@@ -219,7 +231,7 @@ struct HomePageView: View {
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(Color.gray.opacity(0.15))
-                        .frame(height: 16)
+                        .frame(height: 14)
 
                     GeometryReader { geo in
                         Capsule()
@@ -231,11 +243,11 @@ struct HomePageView: View {
                                 )
                             )
                             .frame(
-                                width: monthlyLimit > 0 ? max(16, geo.size.width * progressValue) : 0,
-                                height: 16
+                                width: monthlyLimit > 0 ? max(14, geo.size.width * progressValue) : 0,
+                                height: 14
                             )
                     }
-                    .frame(height: 16)
+                    .frame(height: 14)
                 }
 
                 HStack {
@@ -268,12 +280,59 @@ struct HomePageView: View {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
                 .fill(AppPalette.card)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 28)
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
                         .stroke(AppPalette.border, lineWidth: 1)
                 )
                 .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 6)
         )
         .padding(.horizontal, 12)
+    }
+
+    private var balancesSection: some View {
+        VStack(spacing: 12) {
+            if filteredSearchFriends.isEmpty {
+                emptyStateCard
+            } else {
+                ForEach(filteredSearchFriends) { item in
+                    Button {
+                        onSelectItem(item)
+                    } label: {
+                        HomeBalanceRow(item: item)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            Spacer(minLength: 180)
+        }
+        .padding(.horizontal, 14)
+    }
+
+    private var emptyStateCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            Text("No friends found")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(AppPalette.primaryText)
+
+            Text("Try a different search.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppPalette.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(AppPalette.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(AppPalette.border, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
+        )
     }
 }
 
@@ -313,12 +372,12 @@ struct MonthlyLimitSheet: View {
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(AppPalette.secondaryText)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                            .padding()
                             .background(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(AppPalette.card)
                                     .overlay(
-                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
                                             .stroke(AppPalette.border, lineWidth: 1)
                                     )
                             )
@@ -327,20 +386,23 @@ struct MonthlyLimitSheet: View {
 
                     Button {
                         onSave(Double(amountText) ?? 0)
+                        dismiss()
                     } label: {
                         Text("Save")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
+                            .padding()
                             .background(
-                                LinearGradient(
-                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
                             )
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }
@@ -360,6 +422,7 @@ struct MonthlyLimitSheet: View {
                 amountText = currentLimit > 0 ? String(format: "%.2f", currentLimit) : ""
             }
         }
+        .presentationDetents([.medium])
     }
 
     @ViewBuilder
@@ -369,6 +432,36 @@ struct MonthlyLimitSheet: View {
             .keyboardType(.decimalPad)
         #else
         TextField("Enter monthly limit", text: $amountText)
+        #endif
+    }
+}
+
+struct NotificationPageView: View {
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 16) {
+                Text("Notifications")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+                    .padding(.top, 20)
+
+                Text("No notifications yet")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppPalette.secondaryText)
+
+                Spacer()
+            }
+            .padding(.horizontal, 20)
+        }
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
         #endif
     }
 }
