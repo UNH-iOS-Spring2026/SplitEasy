@@ -123,8 +123,8 @@ struct FriendsPageView: View {
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
-        .padding(.top, -45)
-        .padding(.bottom, -5)
+        .padding(.top, 12)
+        .padding(.bottom, 5)
     }
 
     private var searchBar: some View {

@@ -129,7 +129,7 @@ struct AccountPageView: View {
     private var fixedHeaderView: some View {
         HStack {
             ThemeHeaderButton(showThemeMenu: $showThemeMenu)
-                .padding(.top, -50)
+                .padding(.top, 8)
 
             Spacer()
 
@@ -137,7 +137,7 @@ struct AccountPageView: View {
                 .font(.system(size: 28, weight: .bold))
                 .italic()
                 .foregroundColor(AppPalette.primaryText)
-                .padding(.top, -50)
+                .padding(.top, 8)
         }
     }
 
