@@ -36,6 +36,39 @@ struct PremiumHeaderShape: Shape {
     }
 }
 
+struct HeaderCircleButton: View {
+    let systemName: String
+    var isLoading: Bool = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.white.opacity(0.16))
+                .frame(width: 42, height: 42)
+
+            if isLoading {
+                ProgressView()
+                    .tint(.white)
+            } else {
+                Image(systemName: systemName)
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white)
+            }
+        }
+        .frame(width: 42, height: 42)
+    }
+}
+
+struct HeaderEmptySlot: View {
+    var body: some View {
+        Color.clear
+            .frame(width: 42, height: 42)
+    }
+}
+
+// OLD STYLE HEADER
+// Use this only for:
+// HomePageView, FriendsPageView, ActivityPageView, AccountPageView
 struct CurvedAppHeader<Trailing: View>: View {
     let title: String
     let subtitle: String?
@@ -79,6 +112,90 @@ struct CurvedAppHeader<Trailing: View>: View {
                 Spacer()
 
                 HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+
+                        if let subtitle, !subtitle.isEmpty {
+                            Text(subtitle)
+                                .font(.system(size: 13, weight: .medium))
+                                .foregroundColor(.white.opacity(0.90))
+                                .lineLimit(2)
+                        }
+                    }
+
+                    Spacer(minLength: 10)
+
+                    trailing
+                }
+                .padding(.horizontal, 22)
+                .padding(.bottom, 16)
+            }
+        }
+        .frame(height: height)
+        .clipShape(PremiumHeaderShape(cornerRadius: 34))
+        .shadow(color: AppPalette.accentMid.opacity(0.14), radius: 10, x: 0, y: 6)
+    }
+}
+
+// NEW STYLE HEADER
+// Use this only for pages with back buttons on the left
+struct CurvedBackHeader<Trailing: View>: View {
+    let title: String
+    let subtitle: String?
+    let height: CGFloat
+    let backAction: () -> Void
+    let trailing: Trailing
+
+    init(
+        title: String,
+        subtitle: String? = nil,
+        height: CGFloat = 118,
+        backAction: @escaping () -> Void,
+        @ViewBuilder trailing: () -> Trailing
+    ) {
+        self.title = title
+        self.subtitle = subtitle
+        self.height = height
+        self.backAction = backAction
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            LinearGradient(
+                colors: [
+                    AppPalette.accentStart,
+                    AppPalette.accentEnd
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .overlay(
+                LinearGradient(
+                    colors: [
+                        Color.white.opacity(0.12),
+                        Color.clear
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+
+            VStack(spacing: 0) {
+                Spacer()
+
+                HStack(alignment: .center, spacing: 12) {
+                    Button {
+                        backAction()
+                    } label: {
+                        HeaderCircleButton(systemName: "chevron.left")
+                    }
+                    .buttonStyle(.plain)
+
                     VStack(alignment: .leading, spacing: 3) {
                         Text(title)
                             .font(.system(size: 22, weight: .bold))

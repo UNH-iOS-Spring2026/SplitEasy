@@ -32,6 +32,7 @@ struct ContentView: View {
     @State private var showSettleUpSelectionPage = false
     @State private var showSettleUpPage = false
     @State private var settleUpReturnToFriendDetail = false
+    @State private var settleUpReturnToGroupDetail = false
     @State private var monthlyLimit: Double = 0.0
     @State private var isLoggedIn = false
     @State private var isCheckingSession = true
@@ -181,6 +182,7 @@ struct ContentView: View {
                             showSettleUpSelectionPage = false
                             showSettleUpPage = true
                             settleUpReturnToFriendDetail = false
+                            settleUpReturnToGroupDetail = false
                         }
                     )
                 } else if showFriendDetailPage, let friend = selectedFriendDetail {
@@ -198,6 +200,7 @@ struct ContentView: View {
                             showFriendDetailPage = false
                             showSettleUpPage = true
                             settleUpReturnToFriendDetail = true
+                            settleUpReturnToGroupDetail = false
                         },
                         onRefresh: {
                             loadFriendHistory(friendId: friend.id)
@@ -209,15 +212,24 @@ struct ContentView: View {
                 } else if showGroupDetailPage, let group = selectedGroupDetail {
                     GroupDetailPageView(
                         group: latestGroupVersion(for: group),
+                        memberBalances: groupMemberBalances(for: group),
                         selectedTab: $selectedTab,
                         showGroupDetailPage: $showGroupDetailPage,
                         onAddExpense: { item in
                             addExpenseReturnToGroupDetail = true
                             openExpensePage(for: item)
                         },
+                        onSelectMemberForSettlement: { member in
+                            selectedSettleTarget = latestFriendVersion(for: member)
+                            showGroupDetailPage = false
+                            showSettleUpPage = true
+                            settleUpReturnToFriendDetail = false
+                            settleUpReturnToGroupDetail = true
+                        },
                         onRefresh: {
                             loadGroupHistory(groupId: group.id)
                             loadGroupsFromFirestore()
+                            loadFriendsFromFirestore()
                         }
                     )
                 } else if showAddFriendPage {
@@ -260,6 +272,8 @@ struct ContentView: View {
                             onSettleUpTap: {
                                 showSettleUpSelectionPage = true
                                 selectedTab = .home
+                                settleUpReturnToFriendDetail = false
+                                settleUpReturnToGroupDetail = false
                             },
                             showThemeMenu: $showThemeMenu,
                             onSaveMonthlyLimit: saveMonthlyLimit,
@@ -295,15 +309,28 @@ struct ContentView: View {
                                 showSettleUpPage = false
                                 showSettleUpSelectionPage = true
                                 settleUpReturnToFriendDetail = false
+                                settleUpReturnToGroupDetail = false
                                 selectedTab = .friends
                             },
-                            showThemeMenu: $showThemeMenu
+                            showThemeMenu: $showThemeMenu,
+                            onRefresh: {
+                                loadFriendsFromFirestore()
+                                loadGroupsFromFirestore()
+                                loadActivityFromFirestore()
+                                loadNotificationsFromFirestore()
+                            }
                         )
 
                     case .activity:
                         ActivityPageView(
                             transactions: activityTransactions,
-                            showThemeMenu: $showThemeMenu
+                            showThemeMenu: $showThemeMenu,
+                            onRefresh: {
+                                loadActivityFromFirestore()
+                                loadNotificationsFromFirestore()
+                                loadFriendsFromFirestore()
+                                loadGroupsFromFirestore()
+                            }
                         )
 
                     case .profile:
@@ -317,7 +344,13 @@ struct ContentView: View {
                             onSubmitFeedback: submitFeedback,
                             onContactSupport: contactSupport,
                             onResetPassword: resetPassword,
-                            onSignOut: signOut
+                            onSignOut: signOut,
+                            onRefresh: {
+                                loadNotificationsFromFirestore()
+                                loadActivityFromFirestore()
+                                loadFriendsFromFirestore()
+                                loadGroupsFromFirestore()
+                            }
                         )
 
                     case .add:
@@ -579,7 +612,8 @@ struct ContentView: View {
                         )
                     }
 
-                case .failure:
+                case .failure(let error):
+                    print("❌ fetchNotifications failed: \(error.localizedDescription)")
                     recentNotifications = []
                 }
             }
@@ -731,6 +765,16 @@ struct ContentView: View {
         groupsData.first(where: { $0.id == group.id }) ?? group
     }
 
+    private func groupMemberBalances(for group: BalanceItem) -> [BalanceItem] {
+        group.memberNames.compactMap { memberName in
+            friendsData.first {
+                $0.name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                ==
+                memberName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            }
+        }
+    }
+
     private func openFriendDetailPage(for item: BalanceItem) {
         selectedFriendDetail = latestFriendVersion(for: item)
         loadFriendHistory(friendId: item.id)
@@ -799,6 +843,12 @@ struct ContentView: View {
             showSettleUpPage = false
             showFriendDetailPage = true
             selectedTab = .friends
+        } else if settleUpReturnToGroupDetail, let group = selectedGroupDetail {
+            selectedGroupDetail = latestGroupVersion(for: group)
+            showSettleUpPage = false
+            showGroupDetailPage = true
+            selectedTab = .friends
+            selectedSection = .groups
         } else {
             showSettleUpPage = false
             showSettleUpSelectionPage = true
@@ -935,6 +985,7 @@ struct ContentView: View {
         guard !friendsData[index].isBlocked else { return }
 
         let friendName = friendsData[index].name
+        let currentGroupId = settleUpReturnToGroupDetail ? selectedGroupDetail?.id : nil
 
         FirebaseService.shared.saveSettlement(
             friendDocumentId: itemID,
@@ -945,34 +996,77 @@ struct ContentView: View {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    loadFriendsFromFirestore()
-                    loadActivityFromFirestore()
-                    loadFriendHistory(friendId: itemID)
-
-                    FirebaseService.shared.saveNotification(
-                        title: "Settlement saved",
-                        message: "You settled \(friendName) via \(method)."
-                    ) { _ in
-                        loadNotificationsFromFirestore()
-                    }
-
-                    if settleUpReturnToFriendDetail {
-                        showSettleUpPage = false
-                        showFriendDetailPage = true
-                        selectedTab = .friends
+                    if let groupId = currentGroupId {
+                        FirebaseService.shared.updateGroupBalanceAfterSettlement(
+                            groupDocumentId: groupId,
+                            amount: amount
+                        ) { groupResult in
+                            DispatchQueue.main.async {
+                                switch groupResult {
+                                case .success:
+                                    finishSettlementSuccess(
+                                        itemID: itemID,
+                                        friendName: friendName,
+                                        method: method
+                                    )
+                                case .failure(let error):
+                                    print("❌ updateGroupBalanceAfterSettlement failed: \(error.localizedDescription)")
+                                    finishSettlementSuccess(
+                                        itemID: itemID,
+                                        friendName: friendName,
+                                        method: method
+                                    )
+                                }
+                            }
+                        }
                     } else {
-                        showSettleUpPage = false
-                        showSettleUpSelectionPage = false
-                        selectedTab = .home
+                        finishSettlementSuccess(
+                            itemID: itemID,
+                            friendName: friendName,
+                            method: method
+                        )
                     }
 
-                case .failure:
-                    break
+                case .failure(let error):
+                    print("❌ saveSettlement failed: \(error.localizedDescription)")
                 }
             }
         }
     }
+    
+    private func finishSettlementSuccess(itemID: String, friendName: String, method: String) {
+        loadFriendsFromFirestore()
+        loadGroupsFromFirestore()
 
+        if let selectedGroupDetail {
+            loadGroupHistory(groupId: selectedGroupDetail.id)
+        }
+
+        loadActivityFromFirestore()
+        loadFriendHistory(friendId: itemID)
+
+        FirebaseService.shared.saveNotification(
+            title: "Settlement saved",
+            message: "You settled \(friendName) via \(method)."
+        ) { _ in
+            loadNotificationsFromFirestore()
+        }
+
+        if settleUpReturnToFriendDetail {
+            showSettleUpPage = false
+            showFriendDetailPage = true
+            selectedTab = .friends
+        } else if settleUpReturnToGroupDetail {
+            showSettleUpPage = false
+            showGroupDetailPage = true
+            selectedTab = .friends
+            selectedSection = .groups
+        } else {
+            showSettleUpPage = false
+            showSettleUpSelectionPage = false
+            selectedTab = .home
+        }
+    }
     private func saveExpense(
         itemID: String,
         description: String,
@@ -1298,6 +1392,7 @@ struct ContentView: View {
             showSettleUpSelectionPage = false
             showSettleUpPage = false
             settleUpReturnToFriendDetail = false
+            settleUpReturnToGroupDetail = false
             addExpenseReturnToGroupDetail = false
 
             selectedFriendDetail = nil

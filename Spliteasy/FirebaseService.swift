@@ -147,7 +147,6 @@ struct FirestoreExpensePayload {
 }
 
 final class FirebaseService {
-    // Shared singleton so the same Firebase service is used everywhere.
     static let shared = FirebaseService()
 
     let auth = Auth.auth()
@@ -163,8 +162,6 @@ final class FirebaseService {
     var currentUserEmail: String? {
         auth.currentUser?.email
     }
-    // Creates a new user document right after Firebase Auth signup.
-
 
     func registerUser(
         firstName: String,
@@ -222,8 +219,6 @@ final class FirebaseService {
             }
         }
     }
-    // Allows login using either email or a saved phone number.
-
 
     func loginUser(
         identifier: String,
@@ -331,8 +326,6 @@ final class FirebaseService {
             }
         }
     }
-    // Reads the current user profile from Firestore.
-
 
     func fetchCurrentUserProfile(
         completion: @escaping (Result<AppUserProfile, Error>) -> Void
@@ -508,8 +501,6 @@ final class FirebaseService {
             }
         }
     }
-    // Creates a friend record owned by the logged-in user.
-
 
     func addFriend(
         friendName: String,
@@ -595,8 +586,6 @@ final class FirebaseService {
             }
         }
     }
-    // Creates a new group with selected members.
-
 
     func createGroup(
         name: String,
@@ -732,7 +721,6 @@ final class FirebaseService {
 
         db.collection("notifications")
             .whereField("userId", isEqualTo: uid)
-            .order(by: "createdAt", descending: true)
             .getDocuments { snapshot, error in
                 if let error {
                     completion(.failure(error))
@@ -877,8 +865,6 @@ final class FirebaseService {
             }
         }
     }
-    // Saves a normal friend/group expense and updates the running balance.
-
 
     func saveExpense(
         payload: FirestoreExpensePayload,
@@ -981,8 +967,6 @@ final class FirebaseService {
             }
         }
     }
-    // Special case: group expense also needs to affect related friend balances.
-
 
     func saveGroupExpenseAndUpdateFriends(
         groupDocumentId: String,
@@ -1139,8 +1123,6 @@ final class FirebaseService {
                 }
             }
     }
-    // Used when a user settles part or all of an existing friend balance.
-
 
     func saveSettlement(
         friendDocumentId: String,
@@ -1235,6 +1217,159 @@ final class FirebaseService {
                     "balanceDirection": updatedDirection,
                     "updatedAt": FieldValue.serverTimestamp()
                 ], forDocument: friendRef, merge: true)
+
+                return nil
+            }) { _, error in
+                if let error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+    
+    func updateGroupBalanceAfterSettlement(
+        groupDocumentId: String,
+        amount: Double,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        let groupRef = db.collection("groups").document(groupDocumentId)
+
+        groupRef.getDocument { [weak self] snapshot, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let self else {
+                completion(.success(()))
+                return
+            }
+
+            self.db.runTransaction({ transaction, errorPointer in
+                let groupSnapshot: DocumentSnapshot
+                do {
+                    groupSnapshot = try transaction.getDocument(groupRef)
+                } catch let error as NSError {
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                let currentAmount = groupSnapshot.data()?["balanceAmount"] as? Double ?? 0
+                let currentDirection = groupSnapshot.data()?["balanceDirection"] as? String ?? "owesYou"
+                let signedCurrent = currentDirection == "owesYou" ? currentAmount : -currentAmount
+
+                let signedUpdated: Double
+                if signedCurrent > 0 {
+                    signedUpdated = signedCurrent - amount
+                } else {
+                    signedUpdated = signedCurrent + amount
+                }
+
+                let updatedAmount = abs(signedUpdated)
+                let updatedDirection = signedUpdated >= 0 ? "owesYou" : "youOwe"
+
+                transaction.setData([
+                    "balanceAmount": updatedAmount,
+                    "balanceDirection": updatedDirection,
+                    "updatedAt": FieldValue.serverTimestamp()
+                ], forDocument: groupRef, merge: true)
+
+                return nil
+            }) { _, error in
+                if let error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
+    }
+    func saveGroupSettlement(
+        groupDocumentId: String,
+        groupName: String,
+        amount: Double,
+        method: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        let groupRef = db.collection("groups").document(groupDocumentId)
+
+        groupRef.getDocument { [weak self] snapshot, error in
+            if let error {
+                completion(.failure(error))
+                return
+            }
+
+            guard let self, let uid = self.currentUserId else {
+                completion(.success(()))
+                return
+            }
+
+            let settlementRef = self.db.collection("settlements").document()
+            let activityRef = self.db.collection("users").document(uid).collection("activity").document()
+
+            let dayFormatter = DateFormatter()
+            dayFormatter.dateFormat = "MMM d"
+            let dayText = dayFormatter.string(from: Date())
+
+            let monthFormatter = DateFormatter()
+            monthFormatter.dateFormat = "yyyy-MM"
+            let monthKey = monthFormatter.string(from: Date())
+
+            self.db.runTransaction({ transaction, errorPointer in
+                let targetSnapshot: DocumentSnapshot
+                do {
+                    targetSnapshot = try transaction.getDocument(groupRef)
+                } catch let error as NSError {
+                    errorPointer?.pointee = error
+                    return nil
+                }
+
+                let currentAmount = targetSnapshot.data()?["balanceAmount"] as? Double ?? 0
+                let currentDirection = targetSnapshot.data()?["balanceDirection"] as? String ?? "owesYou"
+                let signedCurrent = currentDirection == "owesYou" ? currentAmount : -currentAmount
+
+                let signedUpdated: Double
+                if signedCurrent > 0 {
+                    signedUpdated = signedCurrent - amount
+                } else {
+                    signedUpdated = signedCurrent + amount
+                }
+
+                let updatedAmount = abs(signedUpdated)
+                let updatedDirection = signedUpdated >= 0 ? "owesYou" : "youOwe"
+
+                let settlementData: [String: Any] = [
+                    "ownerUserId": uid,
+                    "targetType": "group",
+                    "groupDocumentId": groupDocumentId,
+                    "groupName": groupName,
+                    "amount": amount,
+                    "method": method,
+                    "dateText": dayText,
+                    "monthKey": monthKey,
+                    "createdAt": FieldValue.serverTimestamp()
+                ]
+
+                let activityData: [String: Any] = [
+                    "title": "Settle up in \(groupName)",
+                    "subtitle": method,
+                    "amount": amount,
+                    "date": dayText,
+                    "monthKey": monthKey,
+                    "category": "Other",
+                    "entryType": "settlement",
+                    "createdAt": FieldValue.serverTimestamp()
+                ]
+
+                transaction.setData(settlementData, forDocument: settlementRef)
+                transaction.setData(activityData, forDocument: activityRef)
+                transaction.setData([
+                    "balanceAmount": updatedAmount,
+                    "balanceDirection": updatedDirection,
+                    "updatedAt": FieldValue.serverTimestamp()
+                ], forDocument: groupRef, merge: true)
 
                 return nil
             }) { _, error in

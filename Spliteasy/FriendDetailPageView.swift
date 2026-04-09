@@ -46,8 +46,6 @@ struct FriendDetailPageView: View {
         self.onToggleBlock = onToggleBlock
         self.onRemoveFriend = onRemoveFriend
     }
-    // Main screen layout
-
 
     var body: some View {
         ZStack {
@@ -119,65 +117,81 @@ struct FriendDetailPageView: View {
             Text("This will remove this friend from your app and database. You can add them again later if needed.")
         }
     }
-    // Top bar / page heading
-
 
     private var headerView: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showFriendDetailPage = false
-                    selectedTab = .friends
-                }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 10, x: 0, y: 5)
 
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
-            }
-            .buttonStyle(.plain)
-            
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showFriendDetailPage = false
+                        selectedTab = .friends
+                    }
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: 46, height: 46)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
 
-            Spacer()
-
-            Text("Friend Details")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Button {
-                Task {
-                    await refreshData()
-                }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-
-                    if isRefreshing {
-                        ProgressView()
-                            .tint(AppPalette.accentMid)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppPalette.accentMid)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
                     }
                 }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("Friend Details")
+                    .font(.system(size: 24, weight: .bold))
+                    .italic()
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await refreshData()
+                    }
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: 46, height: 46)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+
+                        if isRefreshing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
             }
-            .buttonStyle(.plain)
-            .disabled(isRefreshing)
-            
+            .padding(.horizontal, 16)
         }
+        .frame(height: 96)
     }
 
     private var friendNameCard: some View {
@@ -333,11 +347,11 @@ struct FriendDetailPageView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("Delete Friend")
+                            Text("Remove Friend")
                                 .font(.system(size: 17, weight: .bold))
                                 .foregroundColor(AppPalette.primaryText)
 
-                            Text("Remove from app and database")
+                            Text("Delete this friend from app and database")
                                 .font(.system(size: 13, weight: .semibold))
                                 .foregroundColor(AppPalette.secondaryText)
                         }
@@ -358,29 +372,31 @@ struct FriendDetailPageView: View {
 
     private var addExpenseButton: some View {
         Button {
-            if friend.isBlocked { return }
             onAddExpense(friend)
         } label: {
-            Text(friend.isBlocked ? "User Blocked" : "Add Expense")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundColor(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(
-                    LinearGradient(
-                        colors: friend.isBlocked
-                            ? [Color.gray.opacity(0.7), Color.gray.opacity(0.9)]
-                            : [AppPalette.accentStart, AppPalette.accentEnd],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
+            HStack(spacing: 10) {
+                Image(systemName: "plus")
+                    .font(.system(size: 18, weight: .bold))
+
+                Text("Add Expense")
+                    .font(.system(size: 18, weight: .bold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(
+                LinearGradient(
+                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 10, x: 0, y: 6)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: AppPalette.accentMid.opacity(0.20), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
         .disabled(friend.isBlocked)
-        .opacity(friend.isBlocked ? 0.7 : 1)
+        .opacity(friend.isBlocked ? 0.55 : 1)
     }
 
     private var cardBackground: some View {
@@ -400,16 +416,10 @@ struct FriendDetailPageView: View {
     private func refreshData() async {
         guard !isRefreshing else { return }
 
-        await MainActor.run {
-            isRefreshing = true
-        }
-
+        isRefreshing = true
         onRefresh?()
 
-        try? await Task.sleep(nanoseconds: 700_000_000)
-
-        await MainActor.run {
-            isRefreshing = false
-        }
+        try? await Task.sleep(nanoseconds: 650_000_000)
+        isRefreshing = false
     }
 }

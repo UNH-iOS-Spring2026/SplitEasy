@@ -7,6 +7,7 @@
 // This page is used to add a new expense for either a friend or a group.
 // Different UI parts are shown depending on the selected item.
 //
+
 import SwiftUI
 #if os(iOS)
 import UIKit
@@ -48,55 +49,54 @@ struct AddExpensePageView: View {
     @State private var isUploadingReceipt = false
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    AppPalette.backgroundTop,
-                    AppPalette.backgroundBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerView
-                    .padding(.horizontal, 20)
-                    .padding(.top, 6)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        nameCard
-                        cameraCard
-
-                        inputCard(
-                            icon: "bag",
-                            placeholder: "Enter description",
-                            text: $descriptionText
-                        )
-
-                        amountCard
-                        splitButtonsSection
-
-                        if isGroup && !splitEquallySelected {
-                            payerAmountsCard
+        FixedHeaderScrollContainer(headerHeight: 118) {
+            CurvedBackHeader(
+                title: "Add Expense",
+                subtitle: withName.isEmpty ? "Add a new expense" : withName,
+                height: 118,
+                backAction: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        if let onBack {
+                            onBack()
+                        } else {
+                            selectedTab = .friends
                         }
-
-                        if isGroup {
-                            groupManagementCard
-                        }
-
-                        if enteredAmount > 0 {
-                            summaryCard
-                        }
-
-                        Spacer(minLength: 120)
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 30)
                 }
+            ) {
+                HeaderEmptySlot()
             }
+        } content: {
+            VStack(alignment: .leading, spacing: 18) {
+                nameCard
+                cameraCard
+
+                inputCard(
+                    icon: "bag",
+                    placeholder: "Enter description",
+                    text: $descriptionText
+                )
+
+                amountCard
+                splitButtonsSection
+
+                if isGroup && !splitEquallySelected {
+                    payerAmountsCard
+                }
+
+                if isGroup {
+                    groupManagementCard
+                }
+
+                if enteredAmount > 0 {
+                    summaryCard
+                }
+
+                saveExpenseButton
+                Spacer(minLength: 120)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
         }
         .sheet(isPresented: $showCustomSplitSheet) {
             CustomSplitPageView(
@@ -162,6 +162,7 @@ struct AddExpensePageView: View {
             }
         }
         .onChange(of: selectedItem?.id) { _, _ in
+            withName = selectedItem?.name ?? ""
             #if os(iOS)
             receiptImage = nil
             #endif
@@ -192,71 +193,8 @@ struct AddExpensePageView: View {
 
     private var addableFriends: [BalanceItem] {
         guard let selectedItem, selectedItem.kind == .group else { return [] }
-
         let existingNames = Set(selectedItem.memberNames)
         return availableFriends.filter { !existingNames.contains($0.name) }
-    }
-
-    private var headerView: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    if let onBack {
-                        onBack()
-                    } else {
-                        selectedTab = .friends
-                    }
-                }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
-            }
-            .buttonStyle(.plain)
-            
-
-            Spacer()
-
-            Button {
-                saveExpense()
-            } label: {
-                HStack(spacing: 8) {
-                    if isUploadingReceipt {
-                        ProgressView()
-                            .tint(.white)
-                    }
-
-                    Text("Save")
-                        .font(.system(size: 18, weight: .bold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            AppPalette.accentStart,
-                            AppPalette.accentEnd
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .clipShape(Capsule())
-                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-                .opacity(canSaveExpense ? 1 : 0.65)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSaveExpense || isUploadingReceipt)
-            
-        }
     }
 
     private var nameCard: some View {
@@ -273,15 +211,7 @@ struct AddExpensePageView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 24))
     }
 
     private var cameraCard: some View {
@@ -306,10 +236,7 @@ struct AddExpensePageView: View {
                 .padding(.vertical, 12)
                 .background(
                     LinearGradient(
-                        colors: [
-                            AppPalette.accentStart,
-                            AppPalette.accentEnd
-                        ],
+                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
                         startPoint: .leading,
                         endPoint: .trailing
                     )
@@ -348,15 +275,7 @@ struct AddExpensePageView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 24))
     }
 
     #if os(iOS)
@@ -392,15 +311,7 @@ struct AddExpensePageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var amountCard: some View {
@@ -426,15 +337,7 @@ struct AddExpensePageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     @ViewBuilder
@@ -466,10 +369,7 @@ struct AddExpensePageView: View {
                     .padding(.vertical, 18)
                     .background(
                         LinearGradient(
-                            colors: [
-                                AppPalette.accentStart,
-                                AppPalette.accentEnd
-                            ],
+                            colors: [AppPalette.accentStart, AppPalette.accentEnd],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -556,15 +456,7 @@ struct AddExpensePageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 5)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var payerAmountsCard: some View {
@@ -621,15 +513,7 @@ struct AddExpensePageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 5)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var groupManagementCard: some View {
@@ -713,15 +597,7 @@ struct AddExpensePageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 5)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var groupActionBackground: some View {
@@ -780,15 +656,48 @@ struct AddExpensePageView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(AppPalette.border, lineWidth: 1)
+        .background(cardBackground(cornerRadius: 22))
+    }
+
+    private var saveExpenseButton: some View {
+        Button {
+            saveExpense()
+        } label: {
+            HStack(spacing: 8) {
+                if isUploadingReceipt {
+                    ProgressView()
+                        .tint(.white)
+                }
+
+                Text("Save Expense")
+                    .font(.system(size: 18, weight: .bold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                LinearGradient(
+                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
-                .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 5)
-        )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
+            .opacity(canSaveExpense ? 1 : 0.65)
+        }
+        .buttonStyle(.plain)
+        .disabled(!canSaveExpense || isUploadingReceipt)
+    }
+
+    private func cardBackground(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(AppPalette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(AppPalette.border, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.07), radius: 10, x: 0, y: 6)
     }
 }
 
@@ -1063,65 +972,66 @@ struct GroupMemberPickerSheet: View {
     let title: String
     let people: [String]
     @Binding var selectedPeople: Set<String>
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundColor(AppPalette.primaryText)
+        NavigationStack {
+            VStack(spacing: 0) {
+                if people.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "person.2.slash")
+                            .font(.system(size: 26, weight: .semibold))
+                            .foregroundColor(AppPalette.secondaryText)
 
-                Spacer()
+                        Text("No people available")
+                            .font(.system(size: 17, weight: .bold))
+                            .foregroundColor(AppPalette.primaryText)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    List {
+                        ForEach(people, id: \.self) { person in
+                            Button {
+                                toggle(person)
+                            } label: {
+                                HStack {
+                                    Text(person)
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundColor(AppPalette.primaryText)
 
-                Button("Done") {
-                    dismiss()
-                }
-                .font(.system(size: 17, weight: .bold))
-                .foregroundColor(AppPalette.accentMid)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 16)
+                                    Spacer()
 
-            Divider()
-
-            ScrollView {
-                VStack(spacing: 0) {
-                    ForEach(people, id: \.self) { person in
-                        Button {
-                            toggle(person)
-                        } label: {
-                            HStack {
-                                Text(person)
-                                    .font(.system(size: 17, weight: .semibold))
-                                    .foregroundColor(AppPalette.primaryText)
-
-                                Spacer()
-
-                                Image(systemName: selectedPeople.contains(person) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(selectedPeople.contains(person) ? AppPalette.accentMid : AppPalette.secondaryText.opacity(0.5))
+                                    Image(systemName: selectedPeople.contains(person) ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(selectedPeople.contains(person) ? AppPalette.accentMid : AppPalette.secondaryText.opacity(0.5))
+                                }
+                                .padding(.vertical, 6)
                             }
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 14)
+                            .buttonStyle(.plain)
+                            .listRowBackground(AppPalette.card)
                         }
-                        .buttonStyle(.plain)
-
-                        if person != people.last {
-                            Divider()
-                                .padding(.leading, 20)
-                        }
+                    }
+                    .scrollContentBackground(.hidden)
+                    .background(
+                        LinearGradient(
+                            colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .ignoresSafeArea()
+                    )
+                }
+            }
+            .navigationTitle(title)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") {
+                        dismiss()
                     }
                 }
             }
         }
-        .background(
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-        )
         .presentationDetents([.medium, .large])
     }
 
@@ -1138,6 +1048,7 @@ struct AddGroupMembersSheet: View {
     let availableFriends: [BalanceItem]
     @Binding var selectedFriendIDs: Set<String>
     let onSave: () -> Void
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -1145,98 +1056,68 @@ struct AddGroupMembersSheet: View {
             VStack(spacing: 0) {
                 if availableFriends.isEmpty {
                     VStack(spacing: 12) {
-                        Spacer()
-
-                        Image(systemName: "person.3")
-                            .font(.system(size: 28, weight: .bold))
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .font(.system(size: 26, weight: .semibold))
                             .foregroundColor(AppPalette.secondaryText)
 
                         Text("No more friends to add")
-                            .font(.system(size: 18, weight: .bold))
+                            .font(.system(size: 17, weight: .bold))
                             .foregroundColor(AppPalette.primaryText)
-
-                        Text("All your available friends are already in this group.")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(AppPalette.secondaryText)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 24)
-
-                        Spacer()
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(availableFriends) { friend in
-                                Button {
-                                    toggle(friend.id)
-                                } label: {
-                                    HStack(spacing: 14) {
-                                        Circle()
-                                            .fill(AppPalette.accentMid.opacity(0.14))
-                                            .frame(width: 48, height: 48)
-                                            .overlay(
-                                                Text(String(friend.name.prefix(1)))
-                                                    .font(.system(size: 20, weight: .bold))
-                                                    .foregroundColor(AppPalette.accentMid)
-                                            )
+                    List {
+                        ForEach(availableFriends) { friend in
+                            Button {
+                                toggle(friend.id)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Circle()
+                                        .fill(AppPalette.accentMid.opacity(0.15))
+                                        .frame(width: 42, height: 42)
+                                        .overlay(
+                                            Text(String(friend.name.prefix(1)))
+                                                .font(.system(size: 18, weight: .bold))
+                                                .foregroundColor(AppPalette.accentMid)
+                                        )
 
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(friend.name)
-                                                .font(.system(size: 17, weight: .bold))
-                                                .foregroundColor(AppPalette.primaryText)
+                                    Text(friend.name)
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundColor(AppPalette.primaryText)
 
-                                            Text("Friend")
-                                                .font(.system(size: 13, weight: .semibold))
-                                                .foregroundColor(AppPalette.secondaryText)
-                                        }
+                                    Spacer()
 
-                                        Spacer()
-
-                                        Image(systemName: selectedFriendIDs.contains(friend.id) ? "checkmark.circle.fill" : "circle")
-                                            .font(.system(size: 22, weight: .semibold))
-                                            .foregroundColor(selectedFriendIDs.contains(friend.id) ? AppPalette.accentMid : AppPalette.secondaryText.opacity(0.5))
-                                    }
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 14)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                            .fill(AppPalette.card)
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                                    .stroke(AppPalette.border, lineWidth: 1)
-                                            )
-                                    )
+                                    Image(systemName: selectedFriendIDs.contains(friend.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(.system(size: 20, weight: .semibold))
+                                        .foregroundColor(selectedFriendIDs.contains(friend.id) ? AppPalette.accentMid : AppPalette.secondaryText.opacity(0.5))
                                 }
-                                .buttonStyle(.plain)
+                                .padding(.vertical, 6)
                             }
+                            .buttonStyle(.plain)
+                            .listRowBackground(AppPalette.card)
                         }
-                        .padding(20)
                     }
+                    .scrollContentBackground(.hidden)
+                    .background(
+                        LinearGradient(
+                            colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .ignoresSafeArea()
+                    )
                 }
             }
             .navigationTitle("Add Members")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
+                ToolbarItem(placement: .topBarTrailing) {
                     Button("Save") {
                         onSave()
+                        dismiss()
                     }
                     .disabled(selectedFriendIDs.isEmpty)
                 }
             }
-            .background(
-                LinearGradient(
-                    colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
         }
         .presentationDetents([.medium, .large])
     }

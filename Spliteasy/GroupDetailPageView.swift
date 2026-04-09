@@ -9,9 +9,11 @@ import SwiftUI
 
 struct GroupDetailPageView: View {
     let group: BalanceItem
+    let memberBalances: [BalanceItem]
     @Binding var selectedTab: Tab
     @Binding var showGroupDetailPage: Bool
     let onAddExpense: (BalanceItem) -> Void
+    let onSelectMemberForSettlement: (BalanceItem) -> Void
     let onRefresh: (() -> Void)?
 
     @State private var isRefreshing = false
@@ -33,7 +35,8 @@ struct GroupDetailPageView: View {
                 ScrollView(showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 18) {
                         groupSummaryCard
-                        recentTransactionsSection
+                        balanceCard
+                        membersSection
 
                         Spacer(minLength: 120)
                     }
@@ -57,59 +60,79 @@ struct GroupDetailPageView: View {
     }
 
     private var headerView: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showGroupDetailPage = false
-                    selectedTab = .friends
-                }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
+        ZStack {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 10, x: 0, y: 5)
 
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
-            }
-            .buttonStyle(.plain)
+            HStack {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showGroupDetailPage = false
+                        selectedTab = .friends
+                    }
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: 46, height: 46)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
 
-            Spacer()
-
-            Text("Group Details")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Button {
-                Task {
-                    await refreshData()
-                }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-
-                    if isRefreshing {
-                        ProgressView()
-                            .tint(AppPalette.accentMid)
-                    } else {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(AppPalette.accentMid)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
                     }
                 }
+                .buttonStyle(.plain)
+
+                Spacer()
+
+                Text("Group Details")
+                    .font(.system(size: 24, weight: .bold))
+                    .italic()
+                    .foregroundColor(.white)
+
+                Spacer()
+
+                Button {
+                    Task {
+                        await refreshData()
+                    }
+                } label: {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Color.white.opacity(0.18))
+                            .frame(width: 46, height: 46)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
+                            )
+
+                        if isRefreshing {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
             }
-            .buttonStyle(.plain)
-            .disabled(isRefreshing)
+            .padding(.horizontal, 16)
         }
+        .frame(height: 96)
     }
 
     private var groupSummaryCard: some View {
@@ -145,68 +168,91 @@ struct GroupDetailPageView: View {
         .background(cardBackground)
     }
 
-    private var recentTransactionsSection: some View {
+    private var balanceCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Current Group Balance")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            Text(groupBalanceText)
+                .font(.system(size: 24, weight: .bold))
+                .foregroundColor(group.direction == .owesYou ? .green.opacity(0.88) : .red.opacity(0.88))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+    }
+
+    private var membersSection: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("Recent Transactions")
+            Text("Group Members")
                 .font(.system(size: 22, weight: .bold))
                 .italic()
                 .foregroundColor(AppPalette.primaryText)
 
-            if group.expenses.isEmpty {
+            if memberBalances.isEmpty {
                 VStack(spacing: 10) {
-                    Image(systemName: "tray")
+                    Image(systemName: "person.2.slash")
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundColor(AppPalette.secondaryText)
 
-                    Text("No transactions yet")
+                    Text("No member balances found")
                         .font(.system(size: 17, weight: .bold))
                         .foregroundColor(AppPalette.primaryText)
 
-                    Text("Add an expense for this group to see it here.")
+                    Text("Member balances will appear here when group members match your friends list.")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundColor(AppPalette.secondaryText)
                         .multilineTextAlignment(.center)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 36)
+                .padding(.vertical, 30)
                 .background(cardBackground(cornerRadius: 24))
             } else {
                 VStack(spacing: 12) {
-                    ForEach(group.expenses) { expense in
-                        HStack(spacing: 12) {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .fill(AppPalette.rowIconBg)
-                                .frame(width: 48, height: 48)
-                                .overlay(
-                                    Image(systemName: "receipt")
-                                        .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(AppPalette.accentMid)
-                                )
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(expense.description)
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(AppPalette.primaryText)
-                                    .lineLimit(1)
-
-                                Text(expense.dateText)
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(AppPalette.secondaryText)
-                            }
-
-                            Spacer()
-
-                            Text("$\(String(format: "%.2f", expense.amount))")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(AppPalette.primaryText)
+                    ForEach(memberBalances) { member in
+                        Button {
+                            onSelectMemberForSettlement(member)
+                        } label: {
+                            memberRow(member)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 14)
-                        .background(cardBackground(cornerRadius: 22))
+                        .buttonStyle(.plain)
                     }
                 }
             }
         }
+    }
+
+    private func memberRow(_ member: BalanceItem) -> some View {
+        HStack(spacing: 14) {
+            Circle()
+                .fill(avatarColorForMember(member.name).opacity(0.18))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Text(String(member.name.prefix(1)))
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(avatarColorForMember(member.name))
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(member.name)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Text(member.balanceText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(member.direction == .owesYou ? .green.opacity(0.88) : .red.opacity(0.88))
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .foregroundColor(AppPalette.secondaryText)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var addExpenseButton: some View {
@@ -236,9 +282,19 @@ struct GroupDetailPageView: View {
         .buttonStyle(.plain)
     }
 
+    private var groupBalanceText: String {
+        let value = String(format: "%.2f", group.amount)
+        return group.direction == .owesYou ? "Group owes you $\(value)" : "You owe $\(value)"
+    }
+
     private var avatarColor: Color {
         let colors: [Color] = [AppPalette.accentMid, AppPalette.accentStart, .green, .pink]
         return colors[abs(group.name.hashValue) % colors.count]
+    }
+
+    private func avatarColorForMember(_ member: String) -> Color {
+        let colors: [Color] = [AppPalette.accentMid, AppPalette.accentStart, .green, .pink]
+        return colors[abs(member.hashValue) % colors.count]
     }
 
     private var cardBackground: some View {
@@ -260,8 +316,7 @@ struct GroupDetailPageView: View {
 
         isRefreshing = true
         onRefresh?()
-
-        try? await Task.sleep(nanoseconds: 600_000_000)
+        try? await Task.sleep(nanoseconds: 650_000_000)
         isRefreshing = false
     }
 }

@@ -6,6 +6,7 @@
 //
 // Simple page to save a new friend with name and optional contact detail.
 //
+
 import SwiftUI
 
 struct AddFriendPageView: View {
@@ -18,96 +19,31 @@ struct AddFriendPageView: View {
 
     private let cardBorder = AppPalette.border
     private let cardShadow = Color.black.opacity(0.08)
-    // Main screen layout
-
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    AppPalette.backgroundTop,
-                    AppPalette.backgroundBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
-                    headerSection
-                        .padding(.top, 8)
-
-                    friendNameCard
-                    contactCard
-                    saveFriendButton
-
-                    Spacer(minLength: 120)
+        FixedHeaderScrollContainer(headerHeight: 118) {
+            CurvedBackHeader(
+                title: "Add Friend",
+                subtitle: "Create a new connection",
+                height: 118,
+                backAction: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showAddFriendPage = false
+                        selectedTab = .friends
+                    }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 30)
+            ) {
+                HeaderEmptySlot()
             }
-        }
-    }
-    // Top bar / page heading
-
-
-    private var headerSection: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showAddFriendPage = false
-                    selectedTab = .friends
-                }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: cardShadow, radius: 8, x: 0, y: 4)
-
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
+        } content: {
+            VStack(alignment: .leading, spacing: 18) {
+                friendNameCard
+                contactCard
+                saveFriendButton
+                Spacer(minLength: 120)
             }
-            .buttonStyle(.plain)
-            
-
-            Spacer()
-
-            Text("Add Friend")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Button {
-                saveFriend()
-            } label: {
-                Text("Save")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                AppPalette.accentStart,
-                                AppPalette.accentEnd
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-                    .opacity(trimmedName.isEmpty ? 0.65 : 1.0)
-            }
-            .buttonStyle(.plain)
-            .disabled(trimmedName.isEmpty)
-            
+            .padding(.top, 14)
+            .padding(.horizontal, 20)
         }
     }
 
@@ -202,11 +138,15 @@ struct AddFriendPageView: View {
     }
 
     private func saveFriend() {
-        guard !trimmedName.isEmpty else { return }
+        let name = trimmedName
+        guard !name.isEmpty else { return }
 
-        onSaveFriend(
-            trimmedName,
-            contactText.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
+        let contact = contactText.trimmingCharacters(in: .whitespacesAndNewlines)
+        onSaveFriend(name, contact)
+
+        friendName = ""
+        contactText = ""
+        showAddFriendPage = false
+        selectedTab = .friends
     }
 }

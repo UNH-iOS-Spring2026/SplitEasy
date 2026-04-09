@@ -20,35 +20,33 @@ struct FriendsPageView: View {
     let onSelectItem: (BalanceItem) -> Void
     let onSettleUpTap: () -> Void
     @Binding var showThemeMenu: Bool
+    var onRefresh: (() async -> Void)? = nil
 
     @State private var showFilterSheet = false
     @State private var searchText = ""
+    @Namespace private var friendsSectionNamespace
 
     var body: some View {
-        FixedHeaderScrollContainer(headerHeight: 126) {
+        FixedHeaderScrollContainer(
+            headerHeight: 118,
+            onRefresh: onRefresh
+        ) {
             CurvedAppHeader(
                 title: "Friends",
                 subtitle: "Track friends and groups",
-                height: 126
+                height: 118
             ) {
                 Button {
                     onSettleUpTap()
                 } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.16))
-                            .frame(width: 42, height: 42)
-
-                        Image(systemName: "arrow.left.arrow.right")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.white)
-                    }
+                    HeaderCircleButton(systemName: "arrow.left.arrow.right")
                 }
                 .buttonStyle(.plain)
             }
         } content: {
             VStack(spacing: 0) {
                 searchBar
+                    .padding(.top, 14)
                     .padding(.horizontal, 16)
 
                 summaryCard
@@ -60,14 +58,12 @@ struct FriendsPageView: View {
                             onSelectItem(item)
                         } label: {
                             BalanceRow(item: item)
-                                .transition(
-                                    .asymmetric(
-                                        insertion: .move(edge: .trailing).combined(with: .opacity),
-                                        removal: .move(edge: .leading).combined(with: .opacity)
-                                    )
-                                )
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    if filteredCurrentItems.isEmpty {
+                        emptyStateCard
                     }
 
                     Spacer(minLength: 180)
@@ -250,23 +246,14 @@ struct FriendsPageView: View {
                             .matchedGeometryEffect(id: "friends_section_indicator", in: friendsSectionNamespace)
                     }
                 }
-                .frame(height: 6)
+                .frame(height: 4)
             }
-            .frame(maxWidth: .infinity)
             .padding(.vertical, 10)
-            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
 
-    @Namespace private var friendsSectionNamespace
-
-    private func balancePill(
-        text: String,
-        bg: Color,
-        textColor: Color,
-        icon: String
-    ) -> some View {
+    private func balancePill(text: String, bg: Color, textColor: Color, icon: String) -> some View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.system(size: 13, weight: .bold))
@@ -274,15 +261,41 @@ struct FriendsPageView: View {
             Text(text)
                 .font(.system(size: 14, weight: .bold))
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.85)
         }
         .foregroundColor(textColor)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
         .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(bg)
+        )
+    }
+
+    private var emptyStateCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            Text(selectedSection == .friends ? "No friends found" : "No groups found")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(AppPalette.primaryText)
+
+            Text("Try a different search or add a new one.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppPalette.secondaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(AppPalette.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(AppPalette.border, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
         )
     }
 }

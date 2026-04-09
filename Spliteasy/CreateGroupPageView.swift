@@ -6,6 +6,7 @@
 //
 // Used to create a group, choose members, and select group type.
 //
+
 import SwiftUI
 
 struct CreateGroupPageView: View {
@@ -23,101 +24,37 @@ struct CreateGroupPageView: View {
     private let cardBorder = AppPalette.border
     private let cardShadow = Color.black.opacity(0.08)
     private let iconTint = AppPalette.accentMid
-    // Main screen layout
-
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [
-                    AppPalette.backgroundTop,
-                    AppPalette.backgroundBottom
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 18) {
-                    headerSection
-                        .padding(.top, 8)
-
-                    groupNameCard
-                    addMemberCard
-
-                    if showFriendsList {
-                        friendsSelectionCard
+        FixedHeaderScrollContainer(headerHeight: 118) {
+            CurvedBackHeader(
+                title: "Create Group",
+                subtitle: "Split with multiple people",
+                height: 118,
+                backAction: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showCreateGroupPage = false
+                        selectedTab = .friends
                     }
-
-                    groupTypeSection
-
-                    Spacer(minLength: 120)
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 30)
+            ) {
+                HeaderEmptySlot()
             }
-        }
-    }
-    // Top bar / page heading
+        } content: {
+            VStack(alignment: .leading, spacing: 18) {
+                groupNameCard
+                addMemberCard
 
-
-    private var headerSection: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showCreateGroupPage = false
-                    selectedTab = .friends
+                if showFriendsList {
+                    friendsSelectionCard
                 }
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: cardShadow, radius: 8, x: 0, y: 4)
 
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
+                groupTypeSection
+                saveGroupButton
+                Spacer(minLength: 120)
             }
-            .buttonStyle(.plain)
-            
-
-            Spacer()
-
-            Text("Create Group")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Button {
-                saveGroup()
-            } label: {
-                Text("Save")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                AppPalette.accentStart,
-                                AppPalette.accentEnd
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-                    .opacity(canSaveGroup ? 1.0 : 0.65)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSaveGroup)
-            
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
         }
     }
 
@@ -137,15 +74,7 @@ struct CreateGroupPageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(cardBorder, lineWidth: 1)
-                )
-                .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
-        )
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var addMemberCard: some View {
@@ -183,15 +112,7 @@ struct CreateGroupPageView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 18)
-            .background(
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(AppPalette.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22)
-                            .stroke(cardBorder, lineWidth: 1)
-                    )
-                    .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
-            )
+            .background(cardBackground(cornerRadius: 22))
         }
         .buttonStyle(.plain)
     }
@@ -259,15 +180,7 @@ struct CreateGroupPageView: View {
                 }
             }
         }
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(cardBorder, lineWidth: 1)
-                )
-                .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
-        )
+        .background(cardBackground(cornerRadius: 24))
     }
 
     private var memberSearchBar: some View {
@@ -321,6 +234,7 @@ struct CreateGroupPageView: View {
                             Text(type.title)
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundColor(selectedGroupType == type ? .white : AppPalette.primaryText)
+                                .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity)
                         .frame(height: 82)
@@ -340,20 +254,54 @@ struct CreateGroupPageView: View {
         }
     }
 
+    private var saveGroupButton: some View {
+        Button {
+            saveGroup()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "person.3.fill")
+                    .font(.system(size: 18, weight: .bold))
+
+                Text("Save Group")
+                    .font(.system(size: 18, weight: .bold))
+            }
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                LinearGradient(
+                    colors: [
+                        AppPalette.accentStart,
+                        AppPalette.accentEnd
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
+            .opacity(canSaveGroup ? 1.0 : 0.65)
+        }
+        .buttonStyle(.plain)
+        .disabled(!canSaveGroup)
+    }
+
     private var trimmedGroupName: String {
         groupName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private var canSaveGroup: Bool {
-        !trimmedGroupName.isEmpty && !selectedFriendIDs.isEmpty
-    }
-
     private var filteredFriends: [BalanceItem] {
         let trimmed = memberSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-            return availableFriends
-        }
+        if trimmed.isEmpty { return availableFriends }
         return availableFriends.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+    }
+
+    private var selectedFriends: [BalanceItem] {
+        availableFriends.filter { selectedFriendIDs.contains($0.id) }
+    }
+
+    private var canSaveGroup: Bool {
+        !trimmedGroupName.isEmpty && !selectedFriends.isEmpty
     }
 
     private func toggleFriend(_ id: String) {
@@ -366,46 +314,67 @@ struct CreateGroupPageView: View {
 
     private func saveGroup() {
         guard canSaveGroup else { return }
-        let selectedFriends = availableFriends.filter { selectedFriendIDs.contains($0.id) }
+
         onSaveGroup(trimmedGroupName, selectedGroupType, selectedFriends)
+
+        groupName = ""
+        selectedGroupType = .trip
+        selectedFriendIDs = []
+        memberSearchText = ""
+        showFriendsList = false
+        showCreateGroupPage = false
+        selectedTab = .friends
     }
 
     private func avatarColor(for item: BalanceItem) -> Color {
         let colors: [Color] = [AppPalette.accentMid, AppPalette.accentStart, .green, .pink]
         return colors[abs(item.name.hashValue) % colors.count]
     }
+
+    private func cardBackground(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(AppPalette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(cardBorder, lineWidth: 1)
+            )
+            .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
+    }
 }
 
-enum GroupType: CaseIterable {
+enum GroupType: String, CaseIterable, Hashable {
     case trip
-    case room
+    case home
     case couple
-    case others
+    case other
 
     var title: String {
         switch self {
-        case .trip: return "Trip"
-        case .room: return "Room"
-        case .couple: return "Couple"
-        case .others: return "Others"
+        case .trip:
+            return "Trip"
+        case .home:
+            return "Home"
+        case .couple:
+            return "Couple"
+        case .other:
+            return "Other"
         }
     }
 
     var icon: String {
         switch self {
-        case .trip: return "airplane"
-        case .room: return "house"
-        case .couple: return "heart"
-        case .others: return "square.grid.2x2"
+        case .trip:
+            return "airplane"
+        case .home:
+            return "house.fill"
+        case .couple:
+            return "heart.fill"
+        case .other:
+            return "person.3.fill"
         }
     }
 
     var firestoreValue: String {
-        switch self {
-        case .trip: return "trip"
-        case .room: return "room"
-        case .couple: return "couple"
-        case .others: return "others"
-        }
+        rawValue
     }
 }

@@ -17,66 +17,31 @@ struct RecentSelectionPageView: View {
     let onSelectItem: (BalanceItem) -> Void
     @Binding var selectedTab: Tab
     @Binding var showExpenseSelectionPage: Bool
-    // Main screen layout
-
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerSection
-                    .padding(.horizontal, 20)
-                    .padding(.top, 6)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        recentSection(title: "Recent Friends", items: recentFriends)
-                        recentSection(title: "Recent Groups", items: recentGroups)
-
-                        Spacer(minLength: 160)
+        FixedHeaderScrollContainer(headerHeight: 118) {
+            CurvedBackHeader(
+                title: "Add Expense",
+                subtitle: "Choose friend or group",
+                height: 118,
+                backAction: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showExpenseSelectionPage = false
+                        selectedTab = .home
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 24)
                 }
+            ) {
+                HeaderEmptySlot()
             }
-        }
-    }
-    // Top bar / page heading
-
-
-    private var headerSection: some View {
-        HStack {
-            Button {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    showExpenseSelectionPage = false
-                    selectedTab = .home
-                }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(AppPalette.primaryText)
+        } content: {
+            VStack(alignment: .leading, spacing: 24) {
+                recentSection(title: "Recent Friends", items: recentFriends)
+                recentSection(title: "Recent Groups", items: recentGroups)
+                Spacer(minLength: 160)
             }
-            .buttonStyle(.plain)
-            
-
-            Spacer()
-
-            Text("Add Expenses")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Color.clear.frame(width: 24, height: 24)
+            .padding(.horizontal, 18)
+            .padding(.top, 24)
         }
-        .padding(.top, 6)
     }
 
     private func recentSection(title: String, items: [BalanceItem]) -> some View {
@@ -87,33 +52,37 @@ struct RecentSelectionPageView: View {
                 .foregroundColor(AppPalette.primaryText)
                 .padding(.horizontal, 4)
 
-            VStack(spacing: 0) {
-                ForEach(items) { item in
-                    Button {
-                        onSelectItem(item)
-                    } label: {
-                        recentRow(item: item)
-                    }
-                    .buttonStyle(.plain)
+            if items.isEmpty {
+                emptySectionCard(title: title)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(items) { item in
+                        Button {
+                            onSelectItem(item)
+                        } label: {
+                            recentRow(item: item)
+                        }
+                        .buttonStyle(.plain)
 
-                    if item.id != items.last?.id {
-                        Divider()
-                            .opacity(0.18)
-                            .padding(.leading, 64)
+                        if item.id != items.last?.id {
+                            Divider()
+                                .opacity(0.18)
+                                .padding(.leading, 64)
+                        }
                     }
                 }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 28, style: .continuous)
+                        .fill(AppPalette.card)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                                .stroke(AppPalette.border, lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
+                )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
-                    .fill(AppPalette.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 28)
-                            .stroke(AppPalette.border, lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-            )
         }
     }
 
@@ -148,9 +117,36 @@ struct RecentSelectionPageView: View {
         .padding(.vertical, 12)
     }
 
+    private func emptySectionCard(title: String) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: "tray")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            Text("No items in \(title)")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundColor(AppPalette.primaryText)
+
+            Text("They will appear here after you create them.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppPalette.secondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(AppPalette.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(AppPalette.border, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
+        )
+    }
+
     private func avatarColor(for item: BalanceItem) -> Color {
         let colors: [Color] = [AppPalette.accentMid, AppPalette.accentStart, .green, .pink]
         return colors[abs(item.name.hashValue) % colors.count]
     }
 }
-

@@ -65,7 +65,7 @@ struct HomePageView: View {
                     Button {
                         goToNotifications = true
                     } label: {
-                        ZStack(alignment: .topTrailing) {
+                        ZStack {
                             Circle()
                                 .fill(Color.white.opacity(0.14))
                                 .frame(width: 40, height: 40)
@@ -74,15 +74,16 @@ struct HomePageView: View {
                                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                                 )
 
-                            Image(systemName: "bell")
-                                .font(.system(size: 18, weight: .semibold))
+                            Image(systemName: "bell.fill")
+                                .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
 
                             Circle()
                                 .fill(Color(red: 0.67, green: 0.90, blue: 0.73))
-                                .frame(width: 11, height: 11)
-                                .offset(x: 2, y: -1)
+                                .frame(width: 10, height: 10)
+                                .offset(x: 10, y: -10)
                         }
+                        .frame(width: 40, height: 40)
                     }
                     .buttonStyle(.plain)
                 }
@@ -368,11 +369,11 @@ struct MonthlyLimitSheet: View {
                     Button {
                         amountText = "0"
                     } label: {
-                        Text("Clear Limit")
+                        Text("Clear")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(AppPalette.secondaryText)
+                            .foregroundColor(AppPalette.accentMid)
                             .frame(maxWidth: .infinity)
-                            .padding()
+                            .padding(.vertical, 14)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(AppPalette.card)
@@ -386,13 +387,12 @@ struct MonthlyLimitSheet: View {
 
                     Button {
                         onSave(Double(amountText) ?? 0)
-                        dismiss()
                     } label: {
                         Text("Save")
                             .font(.system(size: 16, weight: .bold))
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
+                            .padding(.vertical, 14)
                             .background(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(
@@ -410,14 +410,7 @@ struct MonthlyLimitSheet: View {
                 Spacer()
             }
             .padding(20)
-            .background(
-                LinearGradient(
-                    colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-            )
+            .navigationTitle("Monthly Limit")
             .onAppear {
                 amountText = currentLimit > 0 ? String(format: "%.2f", currentLimit) : ""
             }
@@ -428,15 +421,18 @@ struct MonthlyLimitSheet: View {
     @ViewBuilder
     private var amountField: some View {
         #if os(iOS)
-        TextField("Enter monthly limit", text: $amountText)
+        TextField("Enter amount", text: $amountText)
             .keyboardType(.decimalPad)
         #else
-        TextField("Enter monthly limit", text: $amountText)
+        TextField("Enter amount", text: $amountText)
         #endif
     }
 }
 
 struct NotificationPageView: View {
+    @State private var notifications: [AppNotificationItem] = []
+    @State private var isLoading = true
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -446,22 +442,103 @@ struct NotificationPageView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                Text("Notifications")
-                    .font(.system(size: 28, weight: .bold))
-                    .foregroundColor(AppPalette.primaryText)
-                    .padding(.top, 20)
+            if isLoading {
+                ProgressView()
+                    .tint(AppPalette.accentMid)
+            } else {
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 12) {
+                        if notifications.isEmpty {
+                            VStack(spacing: 10) {
+                                Image(systemName: "bell.slash")
+                                    .font(.system(size: 24, weight: .semibold))
+                                    .foregroundColor(AppPalette.secondaryText)
 
-                Text("No notifications yet")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(AppPalette.secondaryText)
+                                Text("No notifications yet")
+                                    .font(.system(size: 18, weight: .bold))
+                                    .foregroundColor(AppPalette.primaryText)
 
-                Spacer()
+                                Text("Your recent updates will appear here.")
+                                    .font(.system(size: 14, weight: .medium))
+                                    .foregroundColor(AppPalette.secondaryText)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                    .fill(AppPalette.card)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                            .stroke(AppPalette.border, lineWidth: 1)
+                                    )
+                            )
+                        } else {
+                            ForEach(notifications) { item in
+                                VStack(alignment: .leading, spacing: 6) {
+                                    Text(item.title)
+                                        .font(.system(size: 17, weight: .bold))
+                                        .foregroundColor(AppPalette.primaryText)
+
+                                    Text(item.message)
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(AppPalette.secondaryText)
+
+                                    Text(item.timeText)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(AppPalette.accentMid)
+                                }
+                                .padding(16)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(AppPalette.card)
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                                .stroke(AppPalette.border, lineWidth: 1)
+                                        )
+                                        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 4)
+                                )
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
+                }
+                .refreshable {
+                    loadNotifications()
+                }
             }
-            .padding(.horizontal, 20)
         }
-        #if os(iOS)
+        .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
-        #endif
+        .onAppear {
+            loadNotifications()
+        }
+    }
+
+    private func loadNotifications() {
+        isLoading = true
+
+        FirebaseService.shared.fetchNotifications { result in
+            DispatchQueue.main.async {
+                isLoading = false
+
+                switch result {
+                case .success(let records):
+                    notifications = records.map {
+                        AppNotificationItem(
+                            id: $0.documentId,
+                            title: $0.title,
+                            message: $0.message,
+                            timeText: $0.timeText
+                        )
+                    }
+
+                case .failure:
+                    notifications = []
+                }
+            }
+        }
     }
 }

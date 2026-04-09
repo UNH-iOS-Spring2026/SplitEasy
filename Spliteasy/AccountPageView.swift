@@ -41,6 +41,7 @@ struct AccountPageView: View {
     let onContactSupport: (String, String) -> Void
     let onResetPassword: (String, String, @escaping (Result<Void, Error>) -> Void) -> Void
     let onSignOut: () -> Void
+    var onRefresh: (() async -> Void)? = nil
 
     @State private var nicknameText: String = ""
     @State private var emailText: String = ""
@@ -75,13 +76,49 @@ struct AccountPageView: View {
     @State private var isUpdatingPassword = false
 
     var body: some View {
-        FixedHeaderScrollContainer(headerHeight: 126) {
+        FixedHeaderScrollContainer(
+            headerHeight: 118,
+            onRefresh: {
+                syncFromBindings()
+                loadProfile()
+                await onRefresh?()
+            }
+        ) {
             CurvedAppHeader(
                 title: "Account",
                 subtitle: "Manage your profile",
-                height: 126
+                height: 118
             ) {
-                ThemeHeaderButton(showThemeMenu: $showThemeMenu)
+                HStack(spacing: 10) {
+                    Button {
+                        showNotificationsSheet = true
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color.white.opacity(0.14))
+                                .frame(width: 40, height: 40)
+                                .overlay(
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                                )
+
+                            Image(systemName: "bell.fill")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundColor(.white)
+
+                            if !notifications.isEmpty {
+                                Circle()
+                                    .fill(Color(red: 0.67, green: 0.90, blue: 0.73))
+                                    .frame(width: 10, height: 10)
+                                    .offset(x: 10, y: -10)
+                            }
+                        }
+                        .frame(width: 40, height: 40)
+                    }
+                    .buttonStyle(.plain)
+
+                    ThemeHeaderButton(showThemeMenu: $showThemeMenu)
+                }
             }
         } content: {
             VStack(spacing: 18) {
@@ -93,6 +130,7 @@ struct AccountPageView: View {
                 Spacer(minLength: 120)
             }
             .padding(.horizontal, 20)
+            .padding(.top, 20)
         }
         .onAppear {
             syncFromBindings()
@@ -868,11 +906,11 @@ struct AccountPageView: View {
 
                 switch result {
                 case .success:
-                    resetPasswordMessage = "Password updated successfully."
-                    resetPasswordMessageColor = .green.opacity(0.85)
                     currentPassword = ""
                     newPassword = ""
                     reenteredPassword = ""
+                    resetPasswordMessage = "Password updated successfully."
+                    resetPasswordMessageColor = .green.opacity(0.85)
 
                 case .failure(let error):
                     resetPasswordMessage = error.localizedDescription
@@ -882,14 +920,14 @@ struct AccountPageView: View {
         }
     }
 
-    private func formattedPhone(_ value: String) -> String {
-        let digits = FirebaseService.normalizedPhoneDigits(value)
-        return FirebaseService.formattedPhoneNumber(from: digits)
-    }
-
     private func clearProfileMessage() {
         if !isSavingProfile && !isUploadingProfileImage {
             profileMessage = ""
         }
+    }
+
+    private func formattedPhone(_ value: String) -> String {
+        let digits = FirebaseService.normalizedPhoneDigits(value)
+        return FirebaseService.formattedPhoneNumber(from: digits)
     }
 }

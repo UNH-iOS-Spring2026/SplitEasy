@@ -15,13 +15,16 @@ struct ActivityPageView: View {
     @State private var selectedChart: ActivityChartType = .category
 
     var body: some View {
-        FixedHeaderScrollContainer(headerHeight: 126) {
+        FixedHeaderScrollContainer(
+            headerHeight: 118,
+            onRefresh: onRefresh
+        ) {
             CurvedAppHeader(
                 title: "Activity",
                 subtitle: "All your transactions",
-                height: 126
+                height: 118
             ) {
-                Color.clear.frame(width: 42, height: 42)
+                HeaderEmptySlot()
             }
         } content: {
             VStack(spacing: 0) {
@@ -36,14 +39,21 @@ struct ActivityPageView: View {
                     .padding(.top, 16)
                     .padding(.horizontal, 20)
 
-                VStack(spacing: 0) {
-                    ForEach(transactions) { transaction in
-                        ActivityTransactionRow(item: transaction)
+                if transactions.isEmpty {
+                    emptyStateCard
+                        .padding(.horizontal, 20)
+                        .padding(.top, 12)
+                } else {
+                    VStack(spacing: 12) {
+                        ForEach(transactions) { transaction in
+                            ActivityTransactionRow(item: transaction)
+                        }
                     }
+                    .padding(.top, 12)
+                    .padding(.horizontal, 20)
                 }
-                .padding(.top, 8)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
+
+                Spacer(minLength: 140)
             }
         }
     }
@@ -97,6 +107,34 @@ struct ActivityPageView: View {
         )
     }
 
+    private var emptyStateCard: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            Text("No activity yet")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(AppPalette.primaryText)
+
+            Text("Your expense and settlement history will appear here.")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppPalette.secondaryText)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(AppPalette.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(AppPalette.border, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
+        )
+    }
+
     private var currentMonthTitle: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMMM yyyy"
@@ -127,8 +165,8 @@ struct ActivityPageView: View {
             .sorted { $0.amount > $1.amount }
 
         return sorted.isEmpty
-            ? [CategoryItem(name: "Other", amount: 0.01, color: Color(red: 0.62, green: 0.68, blue: 0.77))]
-            : sorted
+        ? [CategoryItem(name: "Other", amount: 0.01, color: Color(red: 0.62, green: 0.68, blue: 0.77))]
+        : sorted
     }
 
     private var monthlyData: [MonthlyExpense] {
@@ -333,13 +371,13 @@ struct ModernDonutChartView: View {
     }
 
     private func startAngle(for index: Int) -> Angle {
-        let previousTotal = data.prefix(index).reduce(0) { $0 + $1.amount }
-        return .degrees((previousTotal / total) * 360)
+        let previous = data.prefix(index).reduce(0) { $0 + $1.amount }
+        return .degrees((previous / total) * 360)
     }
 
     private func endAngle(for index: Int) -> Angle {
-        let currentTotal = data.prefix(index + 1).reduce(0) { $0 + $1.amount }
-        return .degrees((currentTotal / total) * 360)
+        let current = data.prefix(index + 1).reduce(0) { $0 + $1.amount }
+        return .degrees((current / total) * 360)
     }
 }
 
@@ -354,7 +392,7 @@ struct ActivityDonutSlice: Shape {
         var path = Path()
         path.addArc(
             center: center,
-            radius: radius,
+            radius: radius - 12,
             startAngle: startAngle,
             endAngle: endAngle,
             clockwise: false
@@ -368,35 +406,58 @@ struct ActivityTransactionRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(AppPalette.rowIconBg)
-                .frame(width: 50, height: 50)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(iconBackgroundColor)
+                .frame(width: 52, height: 52)
                 .overlay(
                     Image(systemName: iconName)
                         .font(.system(size: 20, weight: .semibold))
-                        .foregroundColor(AppPalette.accentMid)
+                        .foregroundColor(iconTintColor)
                 )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(AppPalette.primaryText)
+                    .lineLimit(1)
 
-                Text("\(item.subtitle) • \(item.date)")
-                    .font(.system(size: 13, weight: .medium))
+                Text(item.subtitle)
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppPalette.secondaryText)
+                    .lineLimit(1)
+
+                Text(item.date)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText.opacity(0.9))
             }
 
             Spacer()
 
             Text("$\(String(format: "%.2f", item.amount))")
                 .font(.system(size: 16, weight: .bold))
-                .foregroundColor(AppPalette.primaryText)
+                .foregroundColor(amountColor)
+                .multilineTextAlignment(.trailing)
         }
-        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(AppPalette.card)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(AppPalette.border, lineWidth: 1)
+                )
+                .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 5)
+        )
     }
 
     private var iconName: String {
+        let normalizedType = item.entryType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        if normalizedType == "settlement" {
+            return "arrow.left.arrow.right"
+        }
+
         switch item.category.lowercased() {
         case "food":
             return "fork.knife"
@@ -409,5 +470,52 @@ struct ActivityTransactionRow: View {
         default:
             return "receipt"
         }
+    }
+
+    private var iconBackgroundColor: Color {
+        let normalizedType = item.entryType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        if normalizedType == "settlement" {
+            return AppPalette.accentMid.opacity(0.12)
+        }
+
+        switch item.category.lowercased() {
+        case "food":
+            return Color.orange.opacity(0.14)
+        case "transport":
+            return Color.blue.opacity(0.14)
+        case "shopping":
+            return Color.pink.opacity(0.14)
+        case "travel":
+            return Color.green.opacity(0.14)
+        default:
+            return AppPalette.rowIconBg
+        }
+    }
+
+    private var iconTintColor: Color {
+        let normalizedType = item.entryType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        if normalizedType == "settlement" {
+            return AppPalette.accentMid
+        }
+
+        switch item.category.lowercased() {
+        case "food":
+            return .orange
+        case "transport":
+            return .blue
+        case "shopping":
+            return .pink
+        case "travel":
+            return .green
+        default:
+            return AppPalette.accentMid
+        }
+    }
+
+    private var amountColor: Color {
+        let normalizedType = item.entryType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedType == "settlement" ? AppPalette.accentMid : AppPalette.primaryText
     }
 }

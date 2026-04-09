@@ -20,37 +20,42 @@ struct SettleUpPageView: View {
     @State private var showMethodPicker = false
 
     private let themePurple = AppPalette.accentMid
-    // Main screen layout
-
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerView
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        friendCard
-                        outstandingCard
-                        amountCard
-                        paymentMethodCard
-
-                        Spacer(minLength: 120)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 30)
+        FixedHeaderScrollContainer(headerHeight: 118) {
+            CurvedBackHeader(
+                title: "Settle Up",
+                subtitle: friend.name,
+                height: 118,
+                backAction: {
+                    onBack()
                 }
+            ) {
+                Button {
+                    saveSettle()
+                } label: {
+                    Text("Save")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.white.opacity(0.20))
+                        .clipShape(Capsule())
+                        .opacity(canSave ? 1 : 0.65)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
             }
+        } content: {
+            VStack(alignment: .leading, spacing: 18) {
+                friendCard
+                outstandingCard
+                amountCard
+                paymentMethodCard
+                Spacer(minLength: 120)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
         }
         .confirmationDialog("Payment Method", isPresented: $showMethodPicker, titleVisibility: .visible) {
             Button("Cash") { selectedMethod = "Cash" }
@@ -59,60 +64,6 @@ struct SettleUpPageView: View {
         }
         .onAppear {
             amountText = String(format: "%.2f", friend.amount)
-        }
-    }
-    // Top bar / page heading
-
-
-    private var headerView: some View {
-        HStack {
-            Button {
-                onBack()
-            } label: {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(AppPalette.card)
-                        .frame(width: 46, height: 46)
-                        .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 4)
-
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(AppPalette.primaryText)
-                }
-            }
-            .buttonStyle(.plain)
-            
-
-            Spacer()
-
-            Text("Settle Up")
-                .font(.system(size: 24, weight: .bold))
-                .italic()
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Button {
-                saveSettle()
-            } label: {
-                Text("Save")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-                    .background(
-                        LinearGradient(
-                            colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .clipShape(Capsule())
-                    .opacity(canSave ? 1 : 0.65)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canSave)
-            
         }
     }
 
@@ -130,15 +81,7 @@ struct SettleUpPageView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 24))
     }
 
     private var outstandingCard: some View {
@@ -154,15 +97,7 @@ struct SettleUpPageView: View {
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 24))
     }
 
     private var amountCard: some View {
@@ -181,9 +116,7 @@ struct SettleUpPageView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundColor(AppPalette.secondaryText)
 
-                TextField("Enter amount", text: $amountText)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(AppPalette.primaryText)
+                settlementAmountField
 
                 Rectangle()
                     .fill(AppPalette.border)
@@ -192,15 +125,21 @@ struct SettleUpPageView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-        )
+        .background(cardBackground(cornerRadius: 22))
+    }
+
+    @ViewBuilder
+    private var settlementAmountField: some View {
+        #if os(iOS)
+        TextField("Enter amount", text: $amountText)
+            .keyboardType(.decimalPad)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundColor(AppPalette.primaryText)
+        #else
+        TextField("Enter amount", text: $amountText)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundColor(AppPalette.primaryText)
+        #endif
     }
 
     private var paymentMethodCard: some View {
@@ -225,25 +164,13 @@ struct SettleUpPageView: View {
             }
             .padding(.horizontal, 18)
             .padding(.vertical, 18)
-            .background(
-                RoundedRectangle(cornerRadius: 22)
-                    .fill(AppPalette.card)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22)
-                            .stroke(AppPalette.border, lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
-            )
+            .background(cardBackground(cornerRadius: 22))
         }
         .buttonStyle(.plain)
     }
 
     private var enteredAmount: Double {
-        Double(amountText) ?? 0
-    }
-
-    private var canSave: Bool {
-        enteredAmount > 0 && !selectedMethod.isEmpty
+        Double(amountText.trimmingCharacters(in: .whitespacesAndNewlines)) ?? 0
     }
 
     private var balanceText: String {
@@ -255,5 +182,18 @@ struct SettleUpPageView: View {
         guard canSave else { return }
         onSave(friend.id, enteredAmount, selectedMethod)
     }
-}
 
+    private var canSave: Bool {
+        enteredAmount > 0 && !selectedMethod.isEmpty
+    }
+
+    private func cardBackground(cornerRadius: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(AppPalette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(AppPalette.border, lineWidth: 1)
+            )
+            .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 6)
+    }
+}
