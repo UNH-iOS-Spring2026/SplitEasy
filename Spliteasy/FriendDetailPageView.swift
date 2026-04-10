@@ -20,10 +20,13 @@ struct FriendDetailPageView: View {
     let onRefresh: (() -> Void)?
     let onToggleBlock: (BalanceItem) -> Void
     let onRemoveFriend: (BalanceItem) -> Void
+    let onUpdateExpense: (ExpenseEntry, String, Double, GroupExpenseDraft?) -> Void
+    let onDeleteExpense: (ExpenseEntry) -> Void
 
     @State private var isRefreshing = false
     @State private var showBlockConfirm = false
     @State private var showRemoveConfirm = false
+    @State private var selectedExpense: ExpenseEntry?
 
     private let themePurple = AppPalette.accentMid
 
@@ -35,7 +38,9 @@ struct FriendDetailPageView: View {
         onSettleUp: @escaping (BalanceItem) -> Void,
         onRefresh: (() -> Void)? = nil,
         onToggleBlock: @escaping (BalanceItem) -> Void,
-        onRemoveFriend: @escaping (BalanceItem) -> Void
+        onRemoveFriend: @escaping (BalanceItem) -> Void,
+        onUpdateExpense: @escaping (ExpenseEntry, String, Double, GroupExpenseDraft?) -> Void,
+        onDeleteExpense: @escaping (ExpenseEntry) -> Void
     ) {
         self.friend = friend
         self._selectedTab = selectedTab
@@ -45,46 +50,67 @@ struct FriendDetailPageView: View {
         self.onRefresh = onRefresh
         self.onToggleBlock = onToggleBlock
         self.onRemoveFriend = onRemoveFriend
+        self.onUpdateExpense = onUpdateExpense
+        self.onDeleteExpense = onDeleteExpense
     }
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerView
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        friendNameCard
-                        actionCards
-                        managementSection
-
-                        Spacer(minLength: 120)
+        FixedHeaderScrollContainer(
+            headerHeight: 118,
+            onRefresh: {
+                await refreshData()
+            }
+        ) {
+            CurvedBackHeader(
+                title: "Friend Details",
+                subtitle: friend.name,
+                height: 118,
+                backAction: {
+                    withAnimation(.easeInOut(duration: 0.25)) {
+                        showFriendDetailPage = false
+                        selectedTab = .friends
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 110)
                 }
-                .refreshable {
-                    await refreshData()
+            ) {
+                Button {
+                    Task {
+                        await refreshData()
+                    }
+                } label: {
+                    HeaderCircleButton(systemName: "arrow.clockwise", isLoading: isRefreshing)
                 }
+                .buttonStyle(.plain)
+                .disabled(isRefreshing)
             }
-
-            VStack {
-                Spacer()
-
-                addExpenseButton
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
+        } content: {
+            VStack(alignment: .leading, spacing: 18) {
+                friendNameCard
+                actionCards
+                recentTransactionsSection
+                managementSection
+                Spacer(minLength: 140)
             }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
+        }
+        .safeAreaInset(edge: .bottom) {
+            addExpenseButton
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 18)
+                .background(Color.clear)
+        }
+        .sheet(item: $selectedExpense) { expense in
+            EditExpensePageView(
+                parentName: friend.name,
+                expense: expense,
+                onSave: { newDescription, newAmount, groupDraft in
+                    onUpdateExpense(expense, newDescription, newAmount, groupDraft)
+                },
+                onDelete: {
+                    onDeleteExpense(expense)
+                }
+            )
         }
         .confirmationDialog(
             friend.isBlocked ? "Unblock User" : "Block User",
@@ -118,80 +144,8 @@ struct FriendDetailPageView: View {
         }
     }
 
-    private var headerView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 10, x: 0, y: 5)
-
-            HStack {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        showFriendDetailPage = false
-                        selectedTab = .friends
-                    }
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.18))
-                            .frame(width: 46, height: 46)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                            )
-
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Text("Friend Details")
-                    .font(.system(size: 24, weight: .bold))
-                    .italic()
-                    .foregroundColor(.white)
-
-                Spacer()
-
-                Button {
-                    Task {
-                        await refreshData()
-                    }
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.18))
-                            .frame(width: 46, height: 46)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                            )
-
-                        if isRefreshing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .disabled(isRefreshing)
-            }
-            .padding(.horizontal, 16)
-        }
-        .frame(height: 96)
+    private var recentTransactions: [ExpenseEntry] {
+        friend.expenses.filter { $0.dateText != "Contact" }
     }
 
     private var friendNameCard: some View {
@@ -275,13 +229,91 @@ struct FriendDetailPageView: View {
 
             if let subtitle {
                 Text(subtitle)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(AppPalette.secondaryText)
                     .multilineTextAlignment(.center)
             }
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 108)
+        .frame(height: 122)
+        .background(cardBackground)
+    }
+
+    private var recentTransactionsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Recent Transactions")
+                .font(.system(size: 22, weight: .bold))
+                .italic()
+                .foregroundColor(AppPalette.primaryText)
+
+            if recentTransactions.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(AppPalette.secondaryText)
+
+                    Text("No transactions yet")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(AppPalette.primaryText)
+
+                    Text("Expenses with this friend will appear here.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppPalette.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+                .background(cardBackground(cornerRadius: 24))
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(recentTransactions) { expense in
+                        Button {
+                            selectedExpense = expense
+                        } label: {
+                            transactionRow(expense)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func transactionRow(_ expense: ExpenseEntry) -> some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(themePurple.opacity(0.10))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: expense.receiptURL.isEmpty ? "receipt" : "photo")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(themePurple)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(expense.description)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Text(expense.dateText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Text("$\(String(format: "%.2f", expense.amount))")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(cardBackground(cornerRadius: 22))
     }
 
@@ -292,82 +324,63 @@ struct FriendDetailPageView: View {
                 .italic()
                 .foregroundColor(AppPalette.primaryText)
 
-            VStack(spacing: 12) {
-                Button {
-                    showBlockConfirm = true
-                } label: {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color.orange.opacity(0.12))
-                                .frame(width: 50, height: 50)
-
-                            Image(systemName: friend.isBlocked ? "lock.open.fill" : "hand.raised.fill")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.orange.opacity(0.9))
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(friend.isBlocked ? "Unblock User" : "Block User")
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundColor(AppPalette.primaryText)
-
-                            Text(
-                                friend.isBlocked
-                                ? "Allow expenses again"
-                                : "Stop future expenses until unblocked"
-                            )
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(AppPalette.secondaryText)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(AppPalette.secondaryText)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .background(cardBackground(cornerRadius: 22))
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    showRemoveConfirm = true
-                } label: {
-                    HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(Color.red.opacity(0.12))
-                                .frame(width: 50, height: 50)
-
-                            Image(systemName: "trash.fill")
-                                .font(.system(size: 20, weight: .bold))
-                                .foregroundColor(.red.opacity(0.9))
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Remove Friend")
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundColor(AppPalette.primaryText)
-
-                            Text("Delete this friend from app and database")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppPalette.secondaryText)
-                        }
-
-                        Spacer()
-
-                        Image(systemName: "chevron.right")
-                            .foregroundColor(AppPalette.secondaryText)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
-                    .background(cardBackground(cornerRadius: 22))
-                }
-                .buttonStyle(.plain)
+            Button {
+                showBlockConfirm = true
+            } label: {
+                managementRow(
+                    icon: "hand.raised.fill",
+                    iconColor: .orange.opacity(0.9),
+                    iconBackground: Color.orange.opacity(0.12),
+                    title: friend.isBlocked ? "Unblock User" : "Block User",
+                    subtitle: friend.isBlocked ? "Allow future expenses again" : "Stop future expenses until unblocked"
+                )
             }
+            .buttonStyle(.plain)
+
+            Button {
+                showRemoveConfirm = true
+            } label: {
+                managementRow(
+                    icon: "person.crop.circle.badge.xmark",
+                    iconColor: .red.opacity(0.92),
+                    iconBackground: Color.red.opacity(0.12),
+                    title: "Remove Friend",
+                    subtitle: "Delete this friend from app and database"
+                )
+            }
+            .buttonStyle(.plain)
         }
+    }
+
+    private func managementRow(icon: String, iconColor: Color, iconBackground: Color, title: String, subtitle: String) -> some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(iconBackground)
+                .frame(width: 54, height: 54)
+                .overlay(
+                    Image(systemName: icon)
+                        .font(.system(size: 21, weight: .bold))
+                        .foregroundColor(iconColor)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Text(subtitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .foregroundColor(AppPalette.secondaryText)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private var addExpenseButton: some View {
@@ -418,7 +431,6 @@ struct FriendDetailPageView: View {
 
         isRefreshing = true
         onRefresh?()
-
         try? await Task.sleep(nanoseconds: 650_000_000)
         isRefreshing = false
     }

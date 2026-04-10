@@ -1,5 +1,4 @@
 //
-//
 //  Models.swift
 //  Spliteasy
 //
@@ -81,18 +80,62 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
     let dateText: String
     let receiptURL: String
 
+    let targetType: String
+    let targetDocumentId: String
+
+    let paidBy: [String]
+    let splitWith: [String]
+    let paidAmounts: [String: Double]
+    let yourNetAmount: Double
+
+    let isGroupMirror: Bool
+    let parentGroupExpenseId: String
+    let groupName: String
+    let groupMemberNames: [String]
+
     init(
         id: String = UUID().uuidString,
         description: String,
         amount: Double,
         dateText: String,
-        receiptURL: String = ""
+        receiptURL: String = "",
+        targetType: String = "",
+        targetDocumentId: String = "",
+        paidBy: [String] = [],
+        splitWith: [String] = [],
+        paidAmounts: [String: Double] = [:],
+        yourNetAmount: Double = 0,
+        isGroupMirror: Bool = false,
+        parentGroupExpenseId: String = "",
+        groupName: String = "",
+        groupMemberNames: [String] = []
     ) {
         self.id = id
         self.description = description
         self.amount = amount
         self.dateText = dateText
         self.receiptURL = receiptURL
+        self.targetType = targetType
+        self.targetDocumentId = targetDocumentId
+        self.paidBy = paidBy
+        self.splitWith = splitWith
+        self.paidAmounts = paidAmounts
+        self.yourNetAmount = yourNetAmount
+        self.isGroupMirror = isGroupMirror
+        self.parentGroupExpenseId = parentGroupExpenseId
+        self.groupName = groupName
+        self.groupMemberNames = groupMemberNames
+    }
+
+    var isEditableGroupExpense: Bool {
+        targetType == "group" || isGroupMirror
+    }
+
+    var editExpenseDocumentId: String {
+        if isGroupMirror, !parentGroupExpenseId.isEmpty {
+            return parentGroupExpenseId
+        }
+        return id
     }
 }
 

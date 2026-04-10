@@ -92,11 +92,17 @@ struct AddExpensePageView: View {
                     summaryCard
                 }
 
-                saveExpenseButton
-                Spacer(minLength: 120)
+                Spacer(minLength: 140)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
+        }
+        .safeAreaInset(edge: .bottom) {
+            saveExpenseButton
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 18)
+                .background(Color.clear)
         }
         .sheet(isPresented: $showCustomSplitSheet) {
             CustomSplitPageView(
@@ -907,6 +913,8 @@ extension AddExpensePageView {
             paidAmounts: paidAmountsDictionary
         ) : nil
 
+        let amountToSave = isGroup ? enteredAmount : calculatedAmount
+
         #if os(iOS)
         if let image = receiptImage,
            let data = image.jpegData(compressionQuality: 0.6) {
@@ -923,7 +931,7 @@ extension AddExpensePageView {
                         onSaveExpense(
                             selectedItem.id,
                             descriptionText,
-                            calculatedAmount,
+                            amountToSave,
                             activeDirection,
                             draft,
                             url
@@ -932,7 +940,7 @@ extension AddExpensePageView {
                         onSaveExpense(
                             selectedItem.id,
                             descriptionText,
-                            calculatedAmount,
+                            amountToSave,
                             activeDirection,
                             draft,
                             nil
@@ -949,7 +957,7 @@ extension AddExpensePageView {
         onSaveExpense(
             selectedItem.id,
             descriptionText,
-            calculatedAmount,
+            amountToSave,
             activeDirection,
             draft,
             nil

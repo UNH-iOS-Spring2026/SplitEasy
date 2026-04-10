@@ -1,3 +1,4 @@
+//
 //  ContentView.swift
 //  Spliteasy
 //
@@ -207,7 +208,19 @@ struct ContentView: View {
                             loadFriendsFromFirestore()
                         },
                         onToggleBlock: toggleBlockStatus,
-                        onRemoveFriend: removeFriend
+                        onRemoveFriend: removeFriend,
+                        onUpdateExpense: { expense, newDescription, newAmount, groupDraft in
+                            updateExpense(
+                                expense,
+                                parent: friend,
+                                newDescription: newDescription,
+                                newAmount: newAmount,
+                                groupDraft: groupDraft
+                            )
+                        },
+                        onDeleteExpense: { expense in
+                            deleteExpense(expense, parent: friend)
+                        }
                     )
                 } else if showGroupDetailPage, let group = selectedGroupDetail {
                     GroupDetailPageView(
@@ -230,6 +243,18 @@ struct ContentView: View {
                             loadGroupHistory(groupId: group.id)
                             loadGroupsFromFirestore()
                             loadFriendsFromFirestore()
+                        },
+                        onUpdateExpense: { expense, newDescription, newAmount, groupDraft in
+                            updateExpense(
+                                expense,
+                                parent: group,
+                                newDescription: newDescription,
+                                newAmount: newAmount,
+                                groupDraft: groupDraft
+                            )
+                        },
+                        onDeleteExpense: { expense in
+                            deleteExpense(expense, parent: group)
                         }
                     )
                 } else if showAddFriendPage {
@@ -384,9 +409,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if !showCreateGroupPage &&
-                !showAddFriendPage &&
-                !showFriendDetailPage &&
+            if !showFriendDetailPage &&
                 !showGroupDetailPage &&
                 !showSettleUpSelectionPage &&
                 !showSettleUpPage {
@@ -395,7 +418,7 @@ struct ContentView: View {
                     selectedSection: selectedSection,
                     showActionButton: selectedTab == .friends && !showExpenseSelectionPage && !showCreateGroupPage && !showAddFriendPage,
                     showPlusMenu: $showPlusMenu,
-                    hidePlusButton: selectedTab == .activity || selectedTab == .profile || selectedTab == .add || showExpenseSelectionPage || showCreateGroupPage || showAddFriendPage || showFriendDetailPage || showGroupDetailPage || showSettleUpSelectionPage || showSettleUpPage,
+                    hidePlusButton: selectedTab == .activity || selectedTab == .profile || selectedTab == .add || showExpenseSelectionPage || showFriendDetailPage || showGroupDetailPage || showSettleUpSelectionPage || showSettleUpPage,
                     actionButtonPressed: handleFriendsActionButtonTap,
                     addExpensePressed: handleAddExpense
                 )
@@ -1033,7 +1056,7 @@ struct ContentView: View {
             }
         }
     }
-    
+
     private func finishSettlementSuccess(itemID: String, friendName: String, method: String) {
         loadFriendsFromFirestore()
         loadGroupsFromFirestore()
@@ -1067,6 +1090,79 @@ struct ContentView: View {
             selectedTab = .home
         }
     }
+
+    private func updateExpense(
+        _ expense: ExpenseEntry,
+        parent: BalanceItem,
+        newDescription: String,
+        newAmount: Double,
+        groupDraft: GroupExpenseDraft?
+    ) {
+        let _ = groupDraft
+        let category = inferCategory(from: newDescription)
+
+        FirebaseService.shared.updateExpense(
+            expenseDocumentId: expense.id,
+            newDescription: newDescription,
+            newTotalAmount: newAmount,
+            newCategory: category
+        ) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    loadFriendsFromFirestore()
+                    loadGroupsFromFirestore()
+                    loadActivityFromFirestore()
+
+                    if parent.kind == .friend {
+                        loadFriendHistory(friendId: parent.id)
+                    } else {
+                        loadGroupHistory(groupId: parent.id)
+                    }
+
+                    FirebaseService.shared.saveNotification(
+                        title: "Expense updated",
+                        message: "\(newDescription) was updated successfully."
+                    ) { _ in
+                        loadNotificationsFromFirestore()
+                    }
+
+                case .failure(let error):
+                    print("❌ updateExpense failed: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    private func deleteExpense(_ expense: ExpenseEntry, parent: BalanceItem) {
+        FirebaseService.shared.deleteExpense(expenseDocumentId: expense.id) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    loadFriendsFromFirestore()
+                    loadGroupsFromFirestore()
+                    loadActivityFromFirestore()
+
+                    if parent.kind == .friend {
+                        loadFriendHistory(friendId: parent.id)
+                    } else {
+                        loadGroupHistory(groupId: parent.id)
+                    }
+
+                    FirebaseService.shared.saveNotification(
+                        title: "Expense deleted",
+                        message: "\(expense.description) was removed successfully."
+                    ) { _ in
+                        loadNotificationsFromFirestore()
+                    }
+
+                case .failure(let error):
+                    print("❌ deleteExpense failed: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
     private func saveExpense(
         itemID: String,
         description: String,

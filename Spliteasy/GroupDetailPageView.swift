@@ -15,124 +15,70 @@ struct GroupDetailPageView: View {
     let onAddExpense: (BalanceItem) -> Void
     let onSelectMemberForSettlement: (BalanceItem) -> Void
     let onRefresh: (() -> Void)?
+    let onUpdateExpense: (ExpenseEntry, String, Double, GroupExpenseDraft?) -> Void
+    let onDeleteExpense: (ExpenseEntry) -> Void
 
     @State private var isRefreshing = false
+    @State private var selectedExpense: ExpenseEntry?
 
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .ignoresSafeArea()
-
-            VStack(spacing: 0) {
-                headerView
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-
-                ScrollView(showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: 18) {
-                        groupSummaryCard
-                        balanceCard
-                        membersSection
-
-                        Spacer(minLength: 120)
-                    }
-                    .padding(.horizontal, 20)
-                    .padding(.top, 20)
-                    .padding(.bottom, 110)
-                }
-                .refreshable {
-                    await refreshData()
-                }
+        FixedHeaderScrollContainer(
+            headerHeight: 118,
+            onRefresh: {
+                await refreshData()
             }
-
-            VStack {
-                Spacer()
-
-                addExpenseButton
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 28)
-            }
-        }
-    }
-
-    private var headerView: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 10, x: 0, y: 5)
-
-            HStack {
-                Button {
+        ) {
+            CurvedBackHeader(
+                title: "Group Details",
+                subtitle: group.name,
+                height: 118,
+                backAction: {
                     withAnimation(.easeInOut(duration: 0.25)) {
                         showGroupDetailPage = false
                         selectedTab = .friends
                     }
-                } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.18))
-                            .frame(width: 46, height: 46)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                            )
-
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .bold))
-                            .foregroundColor(.white)
-                    }
                 }
-                .buttonStyle(.plain)
-
-                Spacer()
-
-                Text("Group Details")
-                    .font(.system(size: 24, weight: .bold))
-                    .italic()
-                    .foregroundColor(.white)
-
-                Spacer()
-
+            ) {
                 Button {
                     Task {
                         await refreshData()
                     }
                 } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .fill(Color.white.opacity(0.18))
-                            .frame(width: 46, height: 46)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-                            )
-
-                        if isRefreshing {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Image(systemName: "arrow.clockwise")
-                                .font(.system(size: 18, weight: .bold))
-                                .foregroundColor(.white)
-                        }
-                    }
+                    HeaderCircleButton(systemName: "arrow.clockwise", isLoading: isRefreshing)
                 }
                 .buttonStyle(.plain)
                 .disabled(isRefreshing)
             }
-            .padding(.horizontal, 16)
+        } content: {
+            VStack(alignment: .leading, spacing: 18) {
+                groupSummaryCard
+                balanceCard
+                membersSection
+                recentTransactionsSection
+                Spacer(minLength: 140)
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 20)
         }
-        .frame(height: 96)
+        .safeAreaInset(edge: .bottom) {
+            addExpenseButton
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 18)
+                .background(Color.clear)
+        }
+        .sheet(item: $selectedExpense) { expense in
+            EditExpensePageView(
+                parentName: group.name,
+                expense: expense,
+                onSave: { newDescription, newAmount, groupDraft in
+                    onUpdateExpense(expense, newDescription, newAmount, groupDraft)
+                },
+                onDelete: {
+                    onDeleteExpense(expense)
+                }
+            )
+        }
     }
 
     private var groupSummaryCard: some View {
@@ -222,6 +168,84 @@ struct GroupDetailPageView: View {
                 }
             }
         }
+    }
+
+    private var recentTransactionsSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("Recent Transactions")
+                .font(.system(size: 22, weight: .bold))
+                .italic()
+                .foregroundColor(AppPalette.primaryText)
+
+            if group.expenses.isEmpty {
+                VStack(spacing: 10) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundColor(AppPalette.secondaryText)
+
+                    Text("No transactions yet")
+                        .font(.system(size: 17, weight: .bold))
+                        .foregroundColor(AppPalette.primaryText)
+
+                    Text("Group expenses will appear here.")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(AppPalette.secondaryText)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 28)
+                .background(cardBackground(cornerRadius: 24))
+            } else {
+                VStack(spacing: 12) {
+                    ForEach(group.expenses) { expense in
+                        Button {
+                            selectedExpense = expense
+                        } label: {
+                            transactionRow(expense)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func transactionRow(_ expense: ExpenseEntry) -> some View {
+        HStack(spacing: 14) {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(AppPalette.accentMid.opacity(0.10))
+                .frame(width: 50, height: 50)
+                .overlay(
+                    Image(systemName: expense.receiptURL.isEmpty ? "receipt" : "photo")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(AppPalette.accentMid)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(expense.description)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Text(expense.dateText)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 6) {
+                Text("$\(String(format: "%.2f", expense.amount))")
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(AppPalette.primaryText)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(cardBackground(cornerRadius: 22))
     }
 
     private func memberRow(_ member: BalanceItem) -> some View {
