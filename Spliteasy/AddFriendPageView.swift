@@ -7,6 +7,13 @@ struct AddFriendPageView: View {
 
     @State private var friendName: String = ""
     @State private var contactText: String = ""
+    @State private var errorMessage: String = ""
+
+    @FocusState private var focusedField: Field?
+
+    enum Field {
+        case name, contact
+    }
 
     private let cardBorder = AppPalette.border
     private let cardShadow = Color.black.opacity(0.08)
@@ -30,6 +37,14 @@ struct AddFriendPageView: View {
 
                     friendNameCard
                     contactCard
+
+                    if !errorMessage.isEmpty {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .font(.system(size: 14, weight: .medium))
+                            .padding(.horizontal, 5)
+                    }
+
                     saveFriendButton
 
                     Spacer(minLength: 120)
@@ -38,8 +53,12 @@ struct AddFriendPageView: View {
                 .padding(.bottom, 30)
             }
         }
+        .onTapGesture {
+            focusedField = nil // dismiss keyboard
+        }
     }
 
+    // MARK: - Header
     private var headerSection: some View {
         HStack {
             Button {
@@ -49,7 +68,7 @@ struct AddFriendPageView: View {
                 }
             } label: {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    RoundedRectangle(cornerRadius: 14)
                         .fill(AppPalette.card)
                         .frame(width: 46, height: 46)
                         .shadow(color: cardShadow, radius: 8, x: 0, y: 4)
@@ -60,7 +79,6 @@ struct AddFriendPageView: View {
                 }
             }
             .buttonStyle(.plain)
-            .padding(.top, -60)
 
             Spacer()
 
@@ -91,14 +109,13 @@ struct AddFriendPageView: View {
                     )
                     .clipShape(Capsule())
                     .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-                    .opacity(trimmedName.isEmpty ? 0.65 : 1.0)
+                    .opacity(isFormValid ? 1.0 : 0.5)
             }
-            .buttonStyle(.plain)
-            .disabled(trimmedName.isEmpty)
-            .padding(.top, -60)
+            .disabled(!isFormValid)
         }
     }
 
+    // MARK: - Name Card
     private var friendNameCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Friend Name")
@@ -106,6 +123,9 @@ struct AddFriendPageView: View {
                 .foregroundColor(AppPalette.secondaryText)
 
             TextField("Enter friend name", text: $friendName)
+                .focused($focusedField, equals: .name)
+                .textInputAutocapitalization(.words)
+                .disableAutocorrection(true)
                 .font(.system(size: 20, weight: .bold))
                 .foregroundColor(AppPalette.primaryText)
 
@@ -113,26 +133,22 @@ struct AddFriendPageView: View {
                 .fill(AppPalette.border)
                 .frame(height: 1)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(cardBorder, lineWidth: 1)
-                )
-                .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
-        )
+        .padding(18)
+        .background(cardBackground)
     }
 
+    // MARK: - Contact Card
     private var contactCard: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Phone or Email")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
 
-            TextField("Enter phone number or email", text: $contactText)
+            TextField("Enter phone or email", text: $contactText)
+                .focused($focusedField, equals: .contact)
+                .keyboardType(.emailAddress)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(AppPalette.primaryText)
 
@@ -140,30 +156,20 @@ struct AddFriendPageView: View {
                 .fill(AppPalette.border)
                 .frame(height: 1)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 22)
-                        .stroke(cardBorder, lineWidth: 1)
-                )
-                .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
-        )
+        .padding(18)
+        .background(cardBackground)
     }
 
+    // MARK: - Save Button
     private var saveFriendButton: some View {
         Button {
             saveFriend()
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "person.badge.plus")
-                    .font(.system(size: 18, weight: .bold))
-
                 Text("Save Friend")
-                    .font(.system(size: 18, weight: .bold))
             }
+            .font(.system(size: 18, weight: .bold))
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
@@ -177,24 +183,62 @@ struct AddFriendPageView: View {
                     endPoint: .trailing
                 )
             )
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 22))
             .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-            .opacity(trimmedName.isEmpty ? 0.65 : 1.0)
+            .opacity(isFormValid ? 1.0 : 0.5)
         }
-        .buttonStyle(.plain)
-        .disabled(trimmedName.isEmpty)
+        .disabled(!isFormValid)
+    }
+
+    // MARK: - Helpers
+    private var cardBackground: some View {
+        RoundedRectangle(cornerRadius: 22)
+            .fill(AppPalette.card)
+            .overlay(
+                RoundedRectangle(cornerRadius: 22)
+                    .stroke(cardBorder, lineWidth: 1)
+            )
+            .shadow(color: cardShadow, radius: 8, x: 0, y: 5)
     }
 
     private var trimmedName: String {
         friendName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func saveFriend() {
-        guard !trimmedName.isEmpty else { return }
+    private var trimmedContact: String {
+        contactText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
-        onSaveFriend(
-            trimmedName,
-            contactText.trimmingCharacters(in: .whitespacesAndNewlines)
-        )
+    private var isFormValid: Bool {
+        !trimmedName.isEmpty && isValidContact(trimmedContact)
+    }
+
+    private func isValidContact(_ text: String) -> Bool {
+        return isValidEmail(text) || isValidPhone(text)
+    }
+
+    private func isValidEmail(_ text: String) -> Bool {
+        text.contains("@") && text.contains(".")
+    }
+
+    private func isValidPhone(_ text: String) -> Bool {
+        let digits = text.filter { $0.isNumber }
+        return digits.count >= 7
+    }
+
+    private func saveFriend() {
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Name cannot be empty"
+            return
+        }
+
+        guard isValidContact(trimmedContact) else {
+            errorMessage = "Enter a valid phone or email"
+            return
+        }
+
+        errorMessage = ""
+
+        onSaveFriend(trimmedName, trimmedContact)
     }
 }
