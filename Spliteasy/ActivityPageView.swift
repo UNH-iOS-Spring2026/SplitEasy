@@ -141,9 +141,27 @@ struct ActivityPageView: View {
         return formatter.string(from: Date())
     }
 
+    // Only actual expenses should be included in expense charts.
+    private var expenseTransactions: [TransactionItem] {
+        transactions.filter { item in
+            let normalizedType = item.entryType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let normalizedTitle = item.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+            if normalizedType == "settlement" {
+                return false
+            }
+
+            if normalizedTitle.hasPrefix("settle up with") || normalizedTitle.hasPrefix("settle up in") {
+                return false
+            }
+
+            return true
+        }
+    }
+
     private var categoryData: [CategoryItem] {
         let currentMonthKey = monthKey(for: Date())
-        let monthTransactions = transactions.filter { $0.monthKey == currentMonthKey }
+        let monthTransactions = expenseTransactions.filter { $0.monthKey == currentMonthKey }
 
         let grouped = Dictionary(grouping: monthTransactions, by: { $0.category })
             .mapValues { items in
@@ -165,8 +183,8 @@ struct ActivityPageView: View {
             .sorted { $0.amount > $1.amount }
 
         return sorted.isEmpty
-        ? [CategoryItem(name: "Other", amount: 0.01, color: Color(red: 0.62, green: 0.68, blue: 0.77))]
-        : sorted
+            ? [CategoryItem(name: "Other", amount: 0.01, color: Color(red: 0.62, green: 0.68, blue: 0.77))]
+            : sorted
     }
 
     private var monthlyData: [MonthlyExpense] {
@@ -174,14 +192,18 @@ struct ActivityPageView: View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM"
 
-        let grouped = Dictionary(grouping: transactions, by: { $0.monthKey })
+        let grouped = Dictionary(grouping: expenseTransactions, by: { $0.monthKey })
             .mapValues { items in
                 items.reduce(0) { $0 + $1.amount }
             }
 
         return (0..<6).compactMap { offset in
-            guard let date = calendar.date(byAdding: .month, value: -(5 - offset), to: Date()) else { return nil }
+            guard let date = calendar.date(byAdding: .month, value: -(5 - offset), to: Date()) else {
+                return nil
+            }
+
             let key = monthKey(for: date)
+
             return MonthlyExpense(
                 month: formatter.string(from: date),
                 amount: grouped[key] ?? 0
@@ -270,7 +292,11 @@ struct ActivityPageView: View {
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
-                                : LinearGradient(colors: [Color.clear, Color.clear], startPoint: .leading, endPoint: .trailing)
+                                : LinearGradient(
+                                    colors: [Color.clear, Color.clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -299,7 +325,11 @@ struct ActivityPageView: View {
                                     startPoint: .leading,
                                     endPoint: .trailing
                                 )
-                                : LinearGradient(colors: [Color.clear, Color.clear], startPoint: .leading, endPoint: .trailing)
+                                : LinearGradient(
+                                    colors: [Color.clear, Color.clear],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 18, style: .continuous)
