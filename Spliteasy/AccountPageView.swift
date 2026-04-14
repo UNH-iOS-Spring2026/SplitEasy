@@ -3,7 +3,10 @@ import SwiftUI
 import UIKit
 #endif
 
+// Account Page View
+// Handles user profile, settings, feedback, support, and authentication actions
 struct AccountPageView: View {
+    // External Bindings (from parent view)
     @Binding var showThemeMenu: Bool
     @Binding var profileName: String
     @Binding var profileEmail: String
@@ -16,14 +19,17 @@ struct AccountPageView: View {
     let onResetPassword: (String, String, @escaping (Result<Void, Error>) -> Void) -> Void
     let onSignOut: () -> Void
 
+    // Stores editable form data and UI control flags
     @State private var nicknameText: String = ""
     @State private var emailText: String = ""
     @State private var phoneText: String = ""
 
     #if os(iOS)
+    //Profile Image State (iOS only)
     @State private var selectedImage: UIImage?
     #endif
 
+    //UI Control Flags (sheets, loading states, messages)
     @State private var showImagePicker = false
     @State private var profileImageURL: String = ""
     @State private var isUploadingProfileImage = false
@@ -36,11 +42,13 @@ struct AccountPageView: View {
     @State private var showSupportSheet = false
     @State private var showResetPasswordSheet = false
 
+    //Feedback & Support State
     @State private var feedbackRating = 0
     @State private var feedbackMessage = ""
     @State private var supportSubject = ""
     @State private var supportMessage = ""
 
+    //Password Reset State
     @State private var currentPassword = ""
     @State private var newPassword = ""
     @State private var reenteredPassword = ""
@@ -48,6 +56,7 @@ struct AccountPageView: View {
     @State private var resetPasswordMessageColor: Color = .green.opacity(0.85)
     @State private var isUpdatingPassword = false
 
+    //Main Layout
     var body: some View {
         ZStack {
             LinearGradient(
@@ -86,14 +95,17 @@ struct AccountPageView: View {
                 }
             }
         }
+        // Sync UI with stored profile data and fetch latest from backend
         .onAppear {
             syncFromBindings()
             loadProfile()
         }
         #if os(iOS)
+        // Presents image picker for profile photo selection (iOS only)
         .sheet(isPresented: $showImagePicker) {
             ImagePicker(image: $selectedImage)
         }
+        // Uploads selected image to backend when user picks a new one
         .onChange(of: selectedImage) { _, newImage in
             uploadProfileImage(newImage)
         }
@@ -110,6 +122,7 @@ struct AccountPageView: View {
         .sheet(isPresented: $showResetPasswordSheet) {
             resetPasswordSheet
         }
+        // Automatically formats phone number input
         .onChange(of: phoneText) { _, newValue in
             let formatted = formattedPhone(newValue)
             if formatted != newValue {
@@ -118,6 +131,7 @@ struct AccountPageView: View {
                 clearProfileMessage()
             }
         }
+        // Clears success/error message when user edits input
         .onChange(of: nicknameText) { _, _ in
             clearProfileMessage()
         }
@@ -204,6 +218,7 @@ struct AccountPageView: View {
         .background(cardBackground)
     }
 
+    // Displays helper text based on upload state and platform
     private var profileImageHintText: String {
         #if os(iOS)
         return isUploadingProfileImage ? "Uploading image..." : "Tap image to update"
@@ -212,6 +227,7 @@ struct AccountPageView: View {
         #endif
     }
 
+    //AccountField card display
     private var accountFieldsCard: some View {
         VStack(spacing: 16) {
             accountField(title: "Nick Name", text: $nicknameText, placeholder: "Enter nickname")
@@ -369,6 +385,7 @@ struct AccountPageView: View {
         .buttonStyle(.plain)
     }
 
+    // Reusable row for navigation-style actions
     private func profileActionRow(
         icon: String,
         title: String,
@@ -667,6 +684,7 @@ struct AccountPageView: View {
     }
 
     @ViewBuilder
+    // Platform-specific secure field configuration
     private func resetSecureInput(text: Binding<String>, placeholder: String) -> some View {
         #if os(iOS)
         SecureField(placeholder, text: text)
@@ -744,6 +762,7 @@ struct AccountPageView: View {
         reenteredPassword == newPassword
     }
 
+    // Syncs local state with parent bindings
     private func syncFromBindings() {
         nicknameText = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
         emailText = profileEmail
@@ -907,6 +926,7 @@ struct AccountPageView: View {
         }
     }
 
+    // Formats phone number into (XXX) XXX-XXXX
     private func formattedPhone(_ input: String) -> String {
         let digits = input.filter(\.isNumber)
         let limited = String(digits.prefix(10))
