@@ -108,12 +108,19 @@ struct FirestoreNotificationRecord {
     let title: String
     let message: String
     let timeText: String
+    let createdAt: Date
 
     init(documentId: String, data: [String: Any]) {
         self.documentId = documentId
         self.title = data["title"] as? String ?? ""
         self.message = data["message"] as? String ?? ""
         self.timeText = data["timeText"] as? String ?? "Now"
+
+        if let timestamp = data["createdAt"] as? Timestamp {
+            self.createdAt = timestamp.dateValue()
+        } else {
+            self.createdAt = .distantPast
+        }
     }
 }
 
@@ -123,6 +130,11 @@ struct FirestoreExpenseHistoryRecord {
     let amount: Double
     let dateText: String
     let receiptURL: String
+
+    let locationName: String
+    let locationAddress: String
+    let latitude: Double?
+    let longitude: Double?
 
     let targetType: String
     let targetDocumentId: String
@@ -143,6 +155,11 @@ struct FirestoreExpenseHistoryRecord {
         self.amount = data["amount"] as? Double ?? 0
         self.dateText = data["dateText"] as? String ?? ""
         self.receiptURL = data["receiptURL"] as? String ?? ""
+
+        self.locationName = data["locationName"] as? String ?? ""
+        self.locationAddress = data["locationAddress"] as? String ?? ""
+        self.latitude = data["latitude"] as? Double
+        self.longitude = data["longitude"] as? Double
 
         self.targetType = data["targetType"] as? String ?? ""
         self.targetDocumentId = data["targetDocumentId"] as? String ?? ""
@@ -171,7 +188,6 @@ struct FirestoreExpenseHistoryRecord {
         self.groupMemberNames = data["groupMemberNames"] as? [String] ?? []
     }
 }
-
 struct FirestoreExpensePayload {
     let targetType: String
     let targetDocumentId: String
@@ -184,6 +200,11 @@ struct FirestoreExpensePayload {
     let activitySubtitle: String
     let groupDraft: GroupExpenseDraft?
     let receiptURL: String?
+
+    let locationName: String
+    let locationAddress: String
+    let latitude: Double?
+    let longitude: Double?
 }
 
 final class FirebaseService {
@@ -241,7 +262,11 @@ final class FirebaseService {
         category: String,
         dateText: String,
         monthKey: String,
-        receiptURL: String
+        receiptURL: String,
+        locationName: String,
+        locationAddress: String,
+        latitude: Double?,
+        longitude: Double?,
     ) {
         let mirrorRef = db.collection("expenses").document()
         
@@ -261,7 +286,11 @@ final class FirebaseService {
             "parentGroupExpenseId": parentGroupExpenseId,
             "groupDocumentId": groupDocumentId,
             "groupName": groupName,
-            "friendName": friendName
+            "friendName": friendName,
+            "locationName": locationName,
+            "locationAddress": locationAddress,
+            "latitude": latitude as Any,
+            "longitude": longitude as Any,
         ]
         
         transaction.setData(mirrorData, forDocument: mirrorRef)
@@ -838,7 +867,7 @@ final class FirebaseService {
             completion(.success([]))
             return
         }
-        
+
         db.collection("notifications")
             .whereField("userId", isEqualTo: uid)
             .getDocuments { snapshot, error in
@@ -846,34 +875,40 @@ final class FirebaseService {
                     completion(.failure(error))
                     return
                 }
-                
-                let records = snapshot?.documents.map {
+
+                let records = (snapshot?.documents.map {
                     FirestoreNotificationRecord(documentId: $0.documentID, data: $0.data())
-                } ?? []
-                
+                } ?? [])
+                .sorted { $0.createdAt > $1.createdAt }
+
                 completion(.success(records))
             }
     }
-    
+
     func saveNotification(
         title: String,
         message: String,
-        timeText: String = "Now",
+        timeText: String? = nil,
         completion: ((Result<Void, Error>) -> Void)? = nil
     ) {
         guard let uid = currentUserId else {
             completion?(.success(()))
             return
         }
-        
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, h:mm a"
+
+        let readableTime = timeText ?? formatter.string(from: Date())
+
         let payload: [String: Any] = [
             "userId": uid,
             "title": title,
             "message": message,
-            "timeText": timeText,
+            "timeText": readableTime,
             "createdAt": FieldValue.serverTimestamp()
         ]
-        
+
         db.collection("notifications").addDocument(data: payload) { error in
             if let error {
                 completion?(.failure(error))
@@ -1059,7 +1094,11 @@ final class FirebaseService {
                     "splitWith": payload.groupDraft?.splitWith ?? [],
                     "yourNetAmount": payload.groupDraft?.yourNetAmount ?? 0,
                     "paidAmounts": payload.groupDraft?.paidAmounts ?? [:],
-                    "receiptURL": payload.receiptURL ?? ""
+                    "receiptURL": payload.receiptURL ?? "",
+                    "locationName": payload.locationName,
+                    "locationAddress": payload.locationAddress,
+                    "latitude": payload.latitude as Any,
+                    "longitude": payload.longitude as Any,
                 ]
                 
                 let activityData: [String: Any] = [
@@ -1104,8 +1143,12 @@ final class FirebaseService {
         monthKey: String,
         groupDraft: GroupExpenseDraft,
         receiptURL: String?,
+        locationName: String,
+        locationAddress: String,
+        latitude: Double?,
+        longitude: Double?,
         completion: @escaping (Result<Void, Error>) -> Void
-    ) {
+    ){
         guard let uid = currentUserId else {
             completion(.success(()))
             return
@@ -1181,7 +1224,12 @@ final class FirebaseService {
                         "paidAmounts": groupDraft.paidAmounts,
                         "yourOwnShare": yourOwnShare,
                         "receiptURL": receiptURL ?? "",
-                        "groupName": groupName
+                        "groupName": groupName,
+                        "locationName": locationName,
+                        "locationAddress": locationAddress,
+                        "latitude": latitude as Any,
+                        "longitude": longitude as Any,
+                        
                     ]
                     
                     transaction.setData(expenseData, forDocument: expenseRef)
@@ -1238,7 +1286,11 @@ final class FirebaseService {
                                 category: category,
                                 dateText: dateText,
                                 monthKey: monthKey,
-                                receiptURL: receiptURL ?? ""
+                                receiptURL: receiptURL ?? "",
+                                locationName: locationName,
+                                locationAddress: locationAddress,
+                                latitude: latitude,
+                                longitude: longitude
                             )
                         }
                     }
@@ -1310,9 +1362,13 @@ final class FirebaseService {
         newDescription: String,
         newTotalAmount: Double,
         newCategory: String,
+        newLocationName: String,
+        newLocationAddress: String,
+        newLatitude: Double?,
+        newLongitude: Double?,
         groupDraft: GroupExpenseDraft? = nil,
         completion: @escaping (Result<Void, Error>) -> Void
-    ) {
+    ){
         let expenseRef = db.collection("expenses").document(expenseDocumentId)
 
         expenseRef.getDocument { [weak self] snapshot, error in
@@ -1342,6 +1398,10 @@ final class FirebaseService {
                     newDescription: newDescription,
                     newTotalAmount: newTotalAmount,
                     newCategory: newCategory,
+                    newLocationName: newLocationName,
+                    newLocationAddress: newLocationAddress,
+                    newLatitude: newLatitude,
+                    newLongitude: newLongitude,
                     groupDraft: groupDraft,
                     completion: completion
                 )
@@ -1385,9 +1445,13 @@ final class FirebaseService {
                             "description": newDescription,
                             "amount": newTotalAmount,
                             "category": newCategory,
+                            "locationName": newLocationName,
+                            "locationAddress": newLocationAddress,
+                            "latitude": newLatitude as Any,
+                            "longitude": newLongitude as Any,
                             "updatedAt": FieldValue.serverTimestamp()
                         ], forDocument: expenseRef, merge: true)
-
+                        
                         batch.setData([
                             "balanceAmount": abs(signedUpdated),
                             "balanceDirection": signedUpdated >= 0 ? "owesYou" : "youOwe",
@@ -1503,6 +1567,10 @@ final class FirebaseService {
                                 "description": newDescription,
                                 "amount": newTotalAmount,
                                 "category": newCategory,
+                                "locationName": newLocationName,
+                                "locationAddress": newLocationAddress,
+                                "latitude": newLatitude as Any,
+                                "longitude": newLongitude as Any,
                                 "paidBy": finalPaidBy,
                                 "splitWith": finalSplitWith,
                                 "paidAmounts": newPaidAmounts,
@@ -1511,7 +1579,7 @@ final class FirebaseService {
                                 "groupName": resolvedGroupName,
                                 "updatedAt": FieldValue.serverTimestamp()
                             ], forDocument: expenseRef, merge: true)
-
+                            
                             batch.setData([
                                 "balanceAmount": abs(signedUpdatedGroup),
                                 "balanceDirection": signedUpdatedGroup >= 0 ? "owesYou" : "youOwe",

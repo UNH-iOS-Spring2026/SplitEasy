@@ -1,11 +1,3 @@
-//
-//  Models.swift
-//  Spliteasy
-//
-//  Created by SIDHARTHA JAVVADI on 3/24/26.
-//
-// Shared data models used across the app.
-//
 import SwiftUI
 
 enum Tab: String, Sendable {
@@ -79,26 +71,35 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
     let amount: Double
     let dateText: String
     let receiptURL: String
-    
+
+    let locationName: String
+    let locationAddress: String
+    let latitude: Double?
+    let longitude: Double?
+
     let targetType: String
     let targetDocumentId: String
-    
+
     let paidBy: [String]
     let splitWith: [String]
     let paidAmounts: [String: Double]
     let yourNetAmount: Double
-    
+
     let isGroupMirror: Bool
     let parentGroupExpenseId: String
     let groupName: String
     let groupMemberNames: [String]
-    
+
     init(
         id: String = UUID().uuidString,
         description: String,
         amount: Double,
         dateText: String,
         receiptURL: String = "",
+        locationName: String = "",
+        locationAddress: String = "",
+        latitude: Double? = nil,
+        longitude: Double? = nil,
         targetType: String = "",
         targetDocumentId: String = "",
         paidBy: [String] = [],
@@ -115,6 +116,10 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
         self.amount = amount
         self.dateText = dateText
         self.receiptURL = receiptURL
+        self.locationName = locationName
+        self.locationAddress = locationAddress
+        self.latitude = latitude
+        self.longitude = longitude
         self.targetType = targetType
         self.targetDocumentId = targetDocumentId
         self.paidBy = paidBy
@@ -126,21 +131,26 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
         self.groupName = groupName
         self.groupMemberNames = groupMemberNames
     }
-    
+
     var isEditableGroupExpense: Bool {
         targetType == "group" || isGroupMirror
     }
-    
+
     var editExpenseDocumentId: String {
-        // Always prioritize real parent for group edits
         if targetType == "group" {
             if isGroupMirror, !parentGroupExpenseId.isEmpty {
                 return parentGroupExpenseId
             }
             return id
         }
-        
         return id
+    }
+
+    var displayLocationText: String {
+        if !locationName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return locationName
+        }
+        return locationAddress
     }
 }
 

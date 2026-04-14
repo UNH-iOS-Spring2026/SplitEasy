@@ -64,14 +64,19 @@ struct ContentView: View {
     @State private var authEntryScreen: AuthEntryScreen = .welcome
 
     var body: some View {
-        ZStack(alignment: .leading) {
-            if isCheckingSession {
-                loadingView
-            } else if isLoggedIn {
-                mainAppView
-            } else {
-                authEntryView
+        ZStack(alignment: .top) {
+            ZStack(alignment: .leading) {
+                if isCheckingSession {
+                    loadingView
+                } else if isLoggedIn {
+                    mainAppView
+                } else {
+                    authEntryView
+                }
             }
+
+            InAppNotificationOverlay(onTap: nil)
+                .zIndex(999)
         }
         .preferredColorScheme(resolvedColorScheme)
         .onAppear {
@@ -212,12 +217,16 @@ struct ContentView: View {
                         },
                         onToggleBlock: toggleBlockStatus,
                         onRemoveFriend: removeFriend,
-                        onUpdateExpense: { expense, newDescription, newAmount, groupDraft in
+                        onUpdateExpense: { expense, newDescription, newAmount, newLocationName, newLocationAddress, newLatitude, newLongitude, groupDraft in
                             updateExpense(
                                 expense,
                                 parent: friend,
                                 newDescription: newDescription,
                                 newAmount: newAmount,
+                                newLocationName: newLocationName,
+                                newLocationAddress: newLocationAddress,
+                                newLatitude: newLatitude,
+                                newLongitude: newLongitude,
                                 groupDraft: groupDraft
                             )
                         },
@@ -247,12 +256,16 @@ struct ContentView: View {
                             loadGroupsFromFirestore()
                             loadFriendsFromFirestore()
                         },
-                        onUpdateExpense: { expense, newDescription, newAmount, groupDraft in
+                        onUpdateExpense: { expense, newDescription, newAmount, newLocationName, newLocationAddress, newLatitude, newLongitude, groupDraft in
                             updateExpense(
                                 expense,
                                 parent: group,
                                 newDescription: newDescription,
                                 newAmount: newAmount,
+                                newLocationName: newLocationName,
+                                newLocationAddress: newLocationAddress,
+                                newLatitude: newLatitude,
+                                newLongitude: newLongitude,
                                 groupDraft: groupDraft
                             )
                         },
@@ -665,6 +678,10 @@ struct ContentView: View {
                             amount: $0.amount,
                             dateText: $0.dateText,
                             receiptURL: $0.receiptURL,
+                            locationName: $0.locationName,
+                            locationAddress: $0.locationAddress,
+                            latitude: $0.latitude,
+                            longitude: $0.longitude,
                             targetType: $0.targetType,
                             targetDocumentId: $0.targetDocumentId,
                             paidBy: $0.paidBy,
@@ -708,6 +725,10 @@ struct ContentView: View {
                             amount: $0.amount,
                             dateText: $0.dateText,
                             receiptURL: $0.receiptURL,
+                            locationName: $0.locationName,
+                            locationAddress: $0.locationAddress,
+                            latitude: $0.latitude,
+                            longitude: $0.longitude,
                             targetType: $0.targetType,
                             targetDocumentId: $0.targetDocumentId,
                             paidBy: $0.paidBy,
@@ -717,7 +738,9 @@ struct ContentView: View {
                             isGroupMirror: $0.isGroupMirror,
                             parentGroupExpenseId: $0.parentGroupExpenseId,
                             groupName: $0.groupName,
-                            groupMemberNames: $0.groupMemberNames.isEmpty ? groupsData[index].memberNames : $0.groupMemberNames
+                            groupMemberNames: $0.groupMemberNames.isEmpty
+                                ? groupsData[index].memberNames
+                                : $0.groupMemberNames
                         )
                     }
 
@@ -901,6 +924,18 @@ struct ContentView: View {
         }
     }
 
+    private func showInAppNotification(
+        title: String,
+        message: String,
+        systemImage: String = "bell.fill"
+    ) {
+        InAppNotificationManager.shared.show(
+            title: title,
+            message: message,
+            systemImage: systemImage
+        )
+    }
+
     private func saveNewFriend(name: String, contact: String) {
         FirebaseService.shared.addFriend(friendName: name, friendContact: contact) { result in
             DispatchQueue.main.async {
@@ -916,6 +951,11 @@ struct ContentView: View {
                         message: "\(name) was added successfully."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: "Friend added",
+                            message: "\(name) was added successfully.",
+                            systemImage: "person.badge.plus"
+                        )
                     }
 
                 case .failure:
@@ -944,6 +984,11 @@ struct ContentView: View {
                         message: "\(name) was created successfully."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: "Group created",
+                            message: "\(name) was created successfully.",
+                            systemImage: "person.3.fill"
+                        )
                     }
 
                 case .failure:
@@ -980,6 +1025,11 @@ struct ContentView: View {
                         message: "\(namesToAdd.count) member(s) were added to \(group.name)."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: "Members added",
+                            message: "\(namesToAdd.count) member(s) were added to \(group.name).",
+                            systemImage: "person.badge.plus"
+                        )
                     }
 
                 case .failure:
@@ -1016,6 +1066,11 @@ struct ContentView: View {
                         message: "\(group.name) was deleted successfully."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: "Group deleted",
+                            message: "\(group.name) was deleted successfully.",
+                            systemImage: "trash.fill"
+                        )
                     }
 
                 case .failure:
@@ -1095,6 +1150,11 @@ struct ContentView: View {
             message: "You settled \(friendName) via \(method)."
         ) { _ in
             loadNotificationsFromFirestore()
+            showInAppNotification(
+                title: "Settlement saved",
+                message: "You settled \(friendName) via \(method).",
+                systemImage: "checkmark.circle.fill"
+            )
         }
 
         if settleUpReturnToFriendDetail {
@@ -1117,6 +1177,10 @@ struct ContentView: View {
         parent: BalanceItem,
         newDescription: String,
         newAmount: Double,
+        newLocationName: String,
+        newLocationAddress: String,
+        newLatitude: Double?,
+        newLongitude: Double?,
         groupDraft: GroupExpenseDraft?
     ) {
         let category = inferCategory(from: newDescription)
@@ -1126,6 +1190,10 @@ struct ContentView: View {
             newDescription: newDescription,
             newTotalAmount: newAmount,
             newCategory: category,
+            newLocationName: newLocationName,
+            newLocationAddress: newLocationAddress,
+            newLatitude: newLatitude,
+            newLongitude: newLongitude,
             groupDraft: groupDraft
         ) { result in
             DispatchQueue.main.async {
@@ -1155,7 +1223,6 @@ struct ContentView: View {
             }
         }
     }
-
     private func deleteExpense(_ expense: ExpenseEntry, parent: BalanceItem) {
         FirebaseService.shared.deleteExpense(expenseDocumentId: expense.editExpenseDocumentId) { result in
             DispatchQueue.main.async {
@@ -1177,6 +1244,11 @@ struct ContentView: View {
                         message: "\(expense.description) was removed successfully."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: "Expense deleted",
+                            message: "\(expense.description) was removed successfully.",
+                            systemImage: "trash.fill"
+                        )
                     }
 
                 case .failure(let error):
@@ -1191,7 +1263,11 @@ struct ContentView: View {
         amount: Double,
         direction: BalanceDirection,
         groupDraft: GroupExpenseDraft?,
-        receiptURL: String?
+        receiptURL: String?,
+        locationName: String,
+        locationAddress: String,
+        latitude: Double?,
+        longitude: Double?
     ) {
         if let friend = friendsData.first(where: { $0.id == itemID }), friend.isBlocked {
             return
@@ -1228,7 +1304,11 @@ struct ContentView: View {
                 monthKey: monthKey,
                 activitySubtitle: subtitle,
                 groupDraft: nil,
-                receiptURL: receiptURL
+                receiptURL: receiptURL,
+                locationName: locationName,
+                locationAddress: locationAddress,
+                latitude: latitude,
+                longitude: longitude
             )
 
             FirebaseService.shared.saveExpense(payload: payload) { result in
@@ -1244,12 +1324,6 @@ struct ContentView: View {
                             message: "\(description) was added for \(friend.name)."
                         ) { _ in
                             loadNotificationsFromFirestore()
-                        }
-
-                        if let updatedFriend = friendsData.first(where: { $0.id == itemID }) {
-                            selectedFriendDetail = updatedFriend
-                        } else {
-                            selectedFriendDetail = latestFriendVersion(for: friend)
                         }
 
                         showFriendDetailPage = true
@@ -1271,10 +1345,6 @@ struct ContentView: View {
         if let groupIndex = groupsData.firstIndex(where: { $0.id == itemID }) {
             let group = groupsData[groupIndex]
 
-            guard let groupDraft else {
-                return
-            }
-
             FirebaseService.shared.saveGroupExpenseAndUpdateFriends(
                 groupDocumentId: itemID,
                 groupName: group.name,
@@ -1284,8 +1354,17 @@ struct ContentView: View {
                 category: category,
                 dateText: dayText,
                 monthKey: monthKey,
-                groupDraft: groupDraft,
-                receiptURL: receiptURL
+                groupDraft: groupDraft ?? GroupExpenseDraft(
+                    paidBy: ["YOU"],
+                    splitWith: ["YOU"],
+                    yourNetAmount: amount,
+                    paidAmounts: ["YOU": amount]
+                ),
+                receiptURL: receiptURL,
+                locationName: locationName,
+                locationAddress: locationAddress,
+                latitude: latitude,
+                longitude: longitude
             ) { result in
                 DispatchQueue.main.async {
                     switch result {
@@ -1303,18 +1382,11 @@ struct ContentView: View {
                             loadNotificationsFromFirestore()
                         }
 
-                        if let updatedGroup = groupsData.first(where: { $0.id == itemID }) {
-                            selectedGroupDetail = updatedGroup
-                        } else {
-                            selectedGroupDetail = latestGroupVersion(for: group)
-                        }
-
+                        selectedGroupDetail = latestGroupVersion(for: group)
                         showGroupDetailPage = true
-                        showFriendDetailPage = false
                         showExpenseSelectionPage = false
-                        selectedSection = .groups
                         selectedTab = .friends
-                        addExpenseReturnToGroupDetail = false
+                        selectedSection = .groups
 
                     case .failure(let error):
                         print("❌ saveGroupExpenseAndUpdateFriends failed: \(error.localizedDescription)")
@@ -1342,6 +1414,13 @@ struct ContentView: View {
                             : "\(friend.name) was blocked successfully."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: friend.isBlocked ? "User unblocked" : "User blocked",
+                            message: friend.isBlocked
+                                ? "\(friend.name) was unblocked successfully."
+                                : "\(friend.name) was blocked successfully.",
+                            systemImage: "hand.raised.fill"
+                        )
                     }
 
                 case .failure:
@@ -1373,6 +1452,11 @@ struct ContentView: View {
                         message: "\(friend.name) was removed successfully."
                     ) { _ in
                         loadNotificationsFromFirestore()
+                        showInAppNotification(
+                            title: "Friend deleted",
+                            message: "\(friend.name) was removed successfully.",
+                            systemImage: "person.crop.circle.badge.xmark"
+                        )
                     }
 
                 case .failure:
@@ -1423,6 +1507,13 @@ struct ContentView: View {
                 : "Your monthly limit was cleared."
         ) { _ in
             loadNotificationsFromFirestore()
+            showInAppNotification(
+                title: "Monthly limit updated",
+                message: monthlyLimit > 0
+                    ? "Your monthly limit was set to $\(String(format: "%.2f", monthlyLimit))."
+                    : "Your monthly limit was cleared.",
+                systemImage: "slider.horizontal.3"
+            )
         }
     }
 
@@ -1448,6 +1539,11 @@ struct ContentView: View {
                     message: "Your profile was updated successfully."
                 ) { _ in
                     loadNotificationsFromFirestore()
+                    showInAppNotification(
+                        title: "Profile updated",
+                        message: "Your profile was updated successfully.",
+                        systemImage: "person.crop.circle.fill"
+                    )
                 }
             }
         }
@@ -1461,6 +1557,11 @@ struct ContentView: View {
                     message: "Thanks for sharing your feedback."
                 ) { _ in
                     loadNotificationsFromFirestore()
+                    showInAppNotification(
+                        title: "Feedback submitted",
+                        message: "Thanks for sharing your feedback.",
+                        systemImage: "star.bubble.fill"
+                    )
                 }
             }
         }
@@ -1474,6 +1575,11 @@ struct ContentView: View {
                     message: "We received your message and will get back to you."
                 ) { _ in
                     loadNotificationsFromFirestore()
+                    showInAppNotification(
+                        title: "Support message sent",
+                        message: "We received your message and will get back to you.",
+                        systemImage: "phone.fill"
+                    )
                 }
             }
         }

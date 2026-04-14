@@ -15,7 +15,7 @@ struct GroupDetailPageView: View {
     let onAddExpense: (BalanceItem) -> Void
     let onSelectMemberForSettlement: (BalanceItem) -> Void
     let onRefresh: (() -> Void)?
-    let onUpdateExpense: (ExpenseEntry, String, Double, GroupExpenseDraft?) -> Void
+    let onUpdateExpense: (ExpenseEntry, String, Double, String, String, Double?, Double?, GroupExpenseDraft?) -> Void
     let onDeleteExpense: (ExpenseEntry) -> Void
 
     @State private var isRefreshing = false
@@ -71,7 +71,7 @@ struct GroupDetailPageView: View {
             EditExpensePageView(
                 parentName: group.name,
                 expense: expense,
-                onSave: { newDescription, newAmount, groupDraft in
+                onSave: { newDescription, newAmount, newLocationName, newLocationAddress, newLatitude, newLongitude, groupDraft in
                     let safeDraft: GroupExpenseDraft?
 
                     if let draft = groupDraft,
@@ -87,7 +87,16 @@ struct GroupDetailPageView: View {
                         )
                     }
 
-                    onUpdateExpense(expense, newDescription, newAmount, safeDraft)
+                    onUpdateExpense(
+                        expense,
+                        newDescription,
+                        newAmount,
+                        newLocationName,
+                        newLocationAddress,
+                        newLatitude,
+                        newLongitude,
+                        safeDraft
+                    )
                 },
                 onDelete: {
                     onDeleteExpense(expense)
@@ -241,9 +250,17 @@ struct GroupDetailPageView: View {
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(AppPalette.primaryText)
 
-                Text(expense.dateText)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppPalette.secondaryText)
+                VStack(alignment: .leading, spacing: 3) {
+                    if !expense.displayLocationText.isEmpty {
+                        Text(expense.displayLocationText)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppPalette.accentMid)
+                    }
+
+                    Text(expense.dateText)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppPalette.secondaryText)
+                }
             }
 
             Spacer()

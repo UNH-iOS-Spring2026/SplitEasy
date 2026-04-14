@@ -20,7 +20,7 @@ struct FriendDetailPageView: View {
     let onRefresh: (() -> Void)?
     let onToggleBlock: (BalanceItem) -> Void
     let onRemoveFriend: (BalanceItem) -> Void
-    let onUpdateExpense: (ExpenseEntry, String, Double, GroupExpenseDraft?) -> Void
+    let onUpdateExpense: (ExpenseEntry, String, Double, String, String, Double?, Double?, GroupExpenseDraft?) -> Void
     let onDeleteExpense: (ExpenseEntry) -> Void
 
     @State private var isRefreshing = false
@@ -39,7 +39,7 @@ struct FriendDetailPageView: View {
         onRefresh: (() -> Void)? = nil,
         onToggleBlock: @escaping (BalanceItem) -> Void,
         onRemoveFriend: @escaping (BalanceItem) -> Void,
-        onUpdateExpense: @escaping (ExpenseEntry, String, Double, GroupExpenseDraft?) -> Void,
+        onUpdateExpense: @escaping (ExpenseEntry, String, Double, String, String, Double?, Double?, GroupExpenseDraft?) -> Void,
         onDeleteExpense: @escaping (ExpenseEntry) -> Void
     ) {
         self.friend = friend
@@ -104,8 +104,17 @@ struct FriendDetailPageView: View {
             EditExpensePageView(
                 parentName: friend.name,
                 expense: expense,
-                onSave: { newDescription, newAmount, groupDraft in
-                    onUpdateExpense(expense, newDescription, newAmount, groupDraft)
+                onSave: { newDescription, newAmount, newLocationName, newLocationAddress, newLatitude, newLongitude, groupDraft in
+                    onUpdateExpense(
+                        expense,
+                        newDescription,
+                        newAmount,
+                        newLocationName,
+                        newLocationAddress,
+                        newLatitude,
+                        newLongitude,
+                        groupDraft
+                    )
                 },
                 onDelete: {
                     onDeleteExpense(expense)
@@ -295,9 +304,17 @@ struct FriendDetailPageView: View {
                     .font(.system(size: 17, weight: .bold))
                     .foregroundColor(AppPalette.primaryText)
 
-                Text(expense.dateText)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(AppPalette.secondaryText)
+                VStack(alignment: .leading, spacing: 3) {
+                    if !expense.displayLocationText.isEmpty {
+                        Text(expense.displayLocationText)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(AppPalette.accentMid)
+                    }
+
+                    Text(expense.dateText)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(AppPalette.secondaryText)
+                }
             }
 
             Spacer()

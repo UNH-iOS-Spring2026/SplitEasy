@@ -16,7 +16,19 @@ import UIKit
 struct AddExpensePageView: View {
     let selectedItem: BalanceItem?
     let availableFriends: [BalanceItem]
-    let onSaveExpense: (String, String, Double, BalanceDirection, GroupExpenseDraft?, String?) -> Void
+    let onSaveExpense: (
+        String,
+        String,
+        Double,
+        BalanceDirection,
+        GroupExpenseDraft?,
+        String?,
+        String,
+        String,
+        Double?,
+        Double?
+    ) -> Void
+
     let onAddMembersToGroup: (BalanceItem, [BalanceItem]) -> Void
     let onDeleteGroup: (BalanceItem) -> Void
     let onBack: (() -> Void)?
@@ -40,6 +52,11 @@ struct AddExpensePageView: View {
     @State private var showAddMembersSheet = false
     @State private var selectedNewMemberIDs: Set<String> = []
     @State private var showDeleteGroupConfirm = false
+    
+    @State private var locationNameText: String = ""
+    @State private var locationAddressText: String = ""
+    @State private var latitude: Double? = nil
+    @State private var longitude: Double? = nil
 
     #if os(iOS)
     @State private var receiptImage: UIImage?
@@ -64,18 +81,43 @@ struct AddExpensePageView: View {
                     }
                 }
             ) {
-                HeaderEmptySlot()
+                // ✅ UPDATED: Save button moved to header
+                Button {
+                    saveExpense()
+                } label: {
+                    HStack(spacing: 6) {
+                        if isUploadingReceipt {
+                            ProgressView()
+                                .tint(.white)
+                                .scaleEffect(0.8)
+                        }
+
+                        Text("Save")
+                            .font(.system(size: 14, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.white.opacity(0.20))
+                    .clipShape(Capsule())
+                    .opacity(canSaveExpense ? 1 : 0.6)
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSaveExpense || isUploadingReceipt)
             }
         } content: {
             VStack(alignment: .leading, spacing: 18) {
                 nameCard
                 cameraCard
+                
 
                 inputCard(
                     icon: "bag",
                     placeholder: "Enter description",
                     text: $descriptionText
+                    
                 )
+                locationCard
 
                 amountCard
                 splitButtonsSection
@@ -97,13 +139,7 @@ struct AddExpensePageView: View {
             .padding(.horizontal, 20)
             .padding(.top, 20)
         }
-        .safeAreaInset(edge: .bottom) {
-            saveExpenseButton
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-                .padding(.bottom, 18)
-                .background(Color.clear)
-        }
+        
         .sheet(isPresented: $showCustomSplitSheet) {
             CustomSplitPageView(
                 selectedOption: $selectedCustomOption,
@@ -314,6 +350,36 @@ struct AddExpensePageView: View {
                     .fill(AppPalette.border)
                     .frame(height: 1)
             }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .background(cardBackground(cornerRadius: 22))
+    }
+    private var locationCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Location")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            inputCard(
+                icon: "mappin.and.ellipse",
+                placeholder: "Store, restaurant, or trip location",
+                text: $locationNameText
+            )
+
+            TextField("Optional address / area", text: $locationAddressText)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppPalette.searchField)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(AppPalette.border, lineWidth: 1)
+                        )
+                )
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
@@ -665,37 +731,7 @@ struct AddExpensePageView: View {
         .background(cardBackground(cornerRadius: 22))
     }
 
-    private var saveExpenseButton: some View {
-        Button {
-            saveExpense()
-        } label: {
-            HStack(spacing: 8) {
-                if isUploadingReceipt {
-                    ProgressView()
-                        .tint(.white)
-                }
-
-                Text("Save Expense")
-                    .font(.system(size: 18, weight: .bold))
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(
-                LinearGradient(
-                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .shadow(color: AppPalette.accentMid.opacity(0.18), radius: 8, x: 0, y: 4)
-            .opacity(canSaveExpense ? 1 : 0.65)
-        }
-        .buttonStyle(.plain)
-        .disabled(!canSaveExpense || isUploadingReceipt)
-    }
-
+    
     private func cardBackground(cornerRadius: CGFloat) -> some View {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
             .fill(AppPalette.card)
@@ -920,11 +956,11 @@ extension AddExpensePageView {
            let data = image.jpegData(compressionQuality: 0.6) {
             isUploadingReceipt = true
             let expenseId = UUID().uuidString
-
+            
             FirebaseService.shared.uploadReceiptImage(expenseId: expenseId, data: data) { result in
                 DispatchQueue.main.async {
                     isUploadingReceipt = false
-
+                    
                     switch result {
                     case .success(let url):
                         receiptURL = url
@@ -934,7 +970,11 @@ extension AddExpensePageView {
                             amountToSave,
                             activeDirection,
                             draft,
-                            url
+                            url,
+                            locationNameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                            locationAddressText.trimmingCharacters(in: .whitespacesAndNewlines),
+                            latitude,
+                            longitude
                         )
                     case .failure:
                         onSaveExpense(
@@ -943,31 +983,42 @@ extension AddExpensePageView {
                             amountToSave,
                             activeDirection,
                             draft,
-                            nil
+                            nil,
+                            locationNameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                            locationAddressText.trimmingCharacters(in: .whitespacesAndNewlines),
+                            latitude,
+                            longitude
                         )
+                        resetAfterSave()
                     }
-
-                    resetAfterSave()
                 }
+                return
             }
-            return
         }
         #endif
 
-        onSaveExpense(
-            selectedItem.id,
-            descriptionText,
-            amountToSave,
-            activeDirection,
-            draft,
-            nil
-        )
+            onSaveExpense(
+                selectedItem.id,
+                descriptionText,
+                amountToSave,
+                activeDirection,
+                draft,
+                nil,
+                locationNameText.trimmingCharacters(in: .whitespacesAndNewlines),
+                locationAddressText.trimmingCharacters(in: .whitespacesAndNewlines),
+                latitude,
+                longitude
+            )
         resetAfterSave()
     }
 
     private func resetAfterSave() {
         descriptionText = ""
         amountText = ""
+        locationNameText = ""
+        locationAddressText = ""
+        latitude = nil
+        longitude = nil
         paidAmountsText = [:]
         #if os(iOS)
         receiptImage = nil

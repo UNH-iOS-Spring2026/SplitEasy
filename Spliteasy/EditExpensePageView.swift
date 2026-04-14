@@ -10,7 +10,7 @@ import SwiftUI
 struct EditExpensePageView: View {
     let parentName: String
     let expense: ExpenseEntry
-    let onSave: (String, Double, GroupExpenseDraft?) -> Void
+    let onSave: (String, Double, String, String, Double?, Double?, GroupExpenseDraft?) -> Void
     let onDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -26,10 +26,13 @@ struct EditExpensePageView: View {
     @State private var showPaidByPicker = false
     @State private var showSplitPicker = false
 
+    @State private var locationNameText: String
+    @State private var locationAddressText: String
+
     init(
         parentName: String,
         expense: ExpenseEntry,
-        onSave: @escaping (String, Double, GroupExpenseDraft?) -> Void,
+        onSave: @escaping (String, Double, String, String, Double?, Double?, GroupExpenseDraft?) -> Void,
         onDelete: @escaping () -> Void
     ) {
         self.parentName = parentName
@@ -39,6 +42,8 @@ struct EditExpensePageView: View {
 
         self._descriptionText = State(initialValue: expense.description)
         self._amountText = State(initialValue: String(format: "%.2f", expense.amount))
+        self._locationNameText = State(initialValue: expense.locationName)
+        self._locationAddressText = State(initialValue: expense.locationAddress)
         self._selectedPaidByPeople = State(initialValue: Set(expense.paidBy.isEmpty ? ["YOU"] : expense.paidBy))
         self._selectedSplitPeople = State(initialValue: Set(expense.splitWith))
         self._paidAmountsText = State(
@@ -77,6 +82,7 @@ struct EditExpensePageView: View {
             VStack(alignment: .leading, spacing: 18) {
                 expenseInfoCard
                 descriptionCard
+                locationCard
                 amountCard
 
                 if isGroupExpense {
@@ -229,6 +235,45 @@ struct EditExpensePageView: View {
                     .fill(AppPalette.border)
                     .frame(height: 1)
             }
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 18)
+        .background(cardBackground(cornerRadius: 22))
+    }
+
+    private var locationCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Location")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(AppPalette.secondaryText)
+
+            TextField("Store, restaurant, or trip location", text: $locationNameText)
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppPalette.searchField)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(AppPalette.border, lineWidth: 1)
+                        )
+                )
+
+            TextField("Optional address / area", text: $locationAddressText)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(AppPalette.primaryText)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(AppPalette.searchField)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .stroke(AppPalette.border, lineWidth: 1)
+                        )
+                )
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 18)
@@ -522,19 +567,26 @@ struct EditExpensePageView: View {
     private func saveChanges() {
         guard canSave else { return }
 
-        let cleanedDescription = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if isGroupExpense {
-            let draft = GroupExpenseDraft(
+        let draft: GroupExpenseDraft? = isGroupExpense
+            ? GroupExpenseDraft(
                 paidBy: effectivePaidByPeople,
                 splitWith: effectiveSplitPeople,
                 yourNetAmount: groupNetAmount,
-                paidAmounts: Dictionary(uniqueKeysWithValues: effectivePaidByPeople.map { ($0, parsedPaidAmount(for: $0)) })
+                paidAmounts: Dictionary(
+                    uniqueKeysWithValues: effectivePaidByPeople.map { ($0, parsedPaidAmount(for: $0)) }
+                )
             )
-            onSave(cleanedDescription, enteredAmount, draft)
-        } else {
-            onSave(cleanedDescription, enteredAmount, nil)
-        }
+            : nil
+
+        onSave(
+            descriptionText.trimmingCharacters(in: .whitespacesAndNewlines),
+            enteredAmount,
+            locationNameText.trimmingCharacters(in: .whitespacesAndNewlines),
+            locationAddressText.trimmingCharacters(in: .whitespacesAndNewlines),
+            expense.latitude,
+            expense.longitude,
+            draft
+        )
 
         dismiss()
     }
@@ -586,7 +638,11 @@ struct EditGroupMemberPickerSheet: View {
 
                                     Image(systemName: selectedPeople.contains(person) ? "checkmark.circle.fill" : "circle")
                                         .font(.system(size: 20, weight: .semibold))
-                                        .foregroundColor(selectedPeople.contains(person) ? AppPalette.accentMid : AppPalette.secondaryText.opacity(0.5))
+                                        .foregroundColor(
+                                            selectedPeople.contains(person)
+                                            ? AppPalette.accentMid
+                                            : AppPalette.secondaryText.opacity(0.5)
+                                        )
                                 }
                                 .padding(.vertical, 6)
                             }
