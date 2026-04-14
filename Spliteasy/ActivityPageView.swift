@@ -1,9 +1,33 @@
 import SwiftUI
 
+// MARK: - Activity Page
+// Displays user transaction activity including:
+// - Summary charts (category & monthly)
+// - List of recent transactions
+// - Interactive chart toggle
+
 struct ActivityPageView: View {
     let transactions: [TransactionItem]
     @Binding var showThemeMenu: Bool
     @State private var selectedChart: ActivityChartType = .category
+
+    private static let monthTitleFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM yyyy"
+        return f
+    }()
+
+    private static let monthKeyFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
+    private static let shortMonthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM"
+        return f
+    }()
 
     var body: some View {
         GeometryReader { geo in
@@ -119,10 +143,9 @@ struct ActivityPageView: View {
         )
     }
 
+  
     private var currentMonthTitle: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: Date())
+        ActivityPageView.monthTitleFormatter.string(from: Date())
     }
 
     private var categoryData: [CategoryItem] {
@@ -134,29 +157,40 @@ struct ActivityPageView: View {
                 items.reduce(0) { $0 + $1.amount }
             }
 
-        let colors: [String: Color] = [
-            "Food": Color(red: 0.49, green: 0.38, blue: 0.78),
-            "Transport": Color(red: 0.38, green: 0.39, blue: 0.88),
-            "Shopping": Color(red: 0.89, green: 0.27, blue: 0.58),
-            "Travel": Color(red: 0.22, green: 0.70, blue: 0.60),
-            "Other": Color(red: 0.62, green: 0.68, blue: 0.77)
-        ]
-
+        
         let sorted = grouped
             .map { key, value in
-                CategoryItem(name: key, amount: value, color: colors[key] ?? Color.gray)
+                CategoryItem(name: key, amount: value, color: color(for: key))
             }
             .sorted { $0.amount > $1.amount }
 
-        return sorted.isEmpty
-            ? [CategoryItem(name: "Other", amount: 0.01, color: Color(red: 0.62, green: 0.68, blue: 0.77))]
-            : sorted
+        
+        return sorted
+    }
+
+    
+    private func color(for category: String) -> Color {
+        let namedColors: [String: Color] = [
+            "Food":      Color(red: 0.49, green: 0.38, blue: 0.78),
+            "Transport": Color(red: 0.38, green: 0.39, blue: 0.88),
+            "Shopping":  Color(red: 0.89, green: 0.27, blue: 0.58),
+            "Travel":    Color(red: 0.22, green: 0.70, blue: 0.60),
+            "Other":     Color(red: 0.62, green: 0.68, blue: 0.77)
+        ]
+        if let known = namedColors[category] { return known }
+        let palette: [Color] = [
+            Color(red: 0.95, green: 0.50, blue: 0.25),
+            Color(red: 0.25, green: 0.75, blue: 0.85),
+            Color(red: 0.80, green: 0.60, blue: 0.20),
+            Color(red: 0.40, green: 0.80, blue: 0.50),
+            Color(red: 0.70, green: 0.30, blue: 0.90)
+        ]
+        let index = abs(category.hashValue) % palette.count
+        return palette[index]
     }
 
     private var monthlyData: [MonthlyExpense] {
         let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM"
 
         let grouped = Dictionary(grouping: transactions, by: { $0.monthKey })
             .mapValues { items in
@@ -167,38 +201,56 @@ struct ActivityPageView: View {
             guard let date = calendar.date(byAdding: .month, value: -(5 - offset), to: Date()) else { return nil }
             let key = monthKey(for: date)
             return MonthlyExpense(
-                month: formatter.string(from: date),
+                month: ActivityPageView.shortMonthFormatter.string(from: date),
                 amount: grouped[key] ?? 0
             )
         }
     }
 
     private var categoryChartSection: some View {
-        HStack(spacing: 18) {
-            ModernDonutChartView(data: categoryData)
-                .frame(width: 146, height: 146)
+        Group {
+            if categoryData.isEmpty {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "chart.pie")
+                            .font(.system(size: 32, weight: .light))
+                            .foregroundColor(AppPalette.secondaryText.opacity(0.5))
+                        Text("No transactions this month")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(AppPalette.secondaryText)
+                    }
+                    .padding(.vertical, 24)
+                    Spacer()
+                }
+            } else {
+                HStack(spacing: 18) {
+                    ModernDonutChartView(data: categoryData)
+                        .frame(width: 146, height: 146)
 
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(categoryData) { item in
-                    HStack(spacing: 10) {
-                        Circle()
-                            .fill(item.color)
-                            .frame(width: 10, height: 10)
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(categoryData) { item in
+                            HStack(spacing: 10) {
+                                Circle()
+                                    .fill(item.color)
+                                    .frame(width: 10, height: 10)
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.name)
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(AppPalette.primaryText)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(AppPalette.primaryText)
 
-                            Text("$\(String(format: "%.2f", item.amount))")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(AppPalette.secondaryText)
+                                    Text("$\(String(format: "%.2f", item.amount))")
+                                        .font(.system(size: 13, weight: .semibold))
+                                        .foregroundColor(AppPalette.secondaryText)
+                                }
+                            }
                         }
                     }
+
+                    Spacer(minLength: 0)
                 }
             }
-
-            Spacer(minLength: 0)
         }
     }
 
@@ -233,6 +285,27 @@ struct ActivityPageView: View {
         }
     }
 
+    private func toggleBackground(isSelected: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(
+                isSelected
+                ? LinearGradient(
+                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                : LinearGradient(
+                    colors: [Color.clear, Color.clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(AppPalette.border, lineWidth: isSelected ? 0 : 1.5)
+            )
+    }
+
     private var chartToggleButtons: some View {
         HStack(spacing: 12) {
             Button {
@@ -245,22 +318,7 @@ struct ActivityPageView: View {
                     .foregroundColor(selectedChart == .category ? .white : AppPalette.secondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(
-                                selectedChart == .category
-                                ? LinearGradient(
-                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                                : LinearGradient(colors: [Color.clear, Color.clear], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(AppPalette.border, lineWidth: selectedChart == .category ? 0 : 1.5)
-                            )
-                    )
+                    .background(toggleBackground(isSelected: selectedChart == .category))
             }
             .buttonStyle(.plain)
 
@@ -274,48 +332,31 @@ struct ActivityPageView: View {
                     .foregroundColor(selectedChart == .month ? .white : AppPalette.secondaryText)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(
-                                selectedChart == .month
-                                ? LinearGradient(
-                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                                : LinearGradient(colors: [Color.clear, Color.clear], startPoint: .leading, endPoint: .trailing)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(AppPalette.border, lineWidth: selectedChart == .month ? 0 : 1.5)
-                            )
-                    )
+                    .background(toggleBackground(isSelected: selectedChart == .month))
             }
             .buttonStyle(.plain)
         }
     }
 
     private func monthKey(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM"
-        return formatter.string(from: date)
+        ActivityPageView.monthKeyFormatter.string(from: date)
     }
 
     private func shortAmount(_ amount: Double) -> String {
-        if amount >= 1000 {
-            return String(format: "$%.1fk", amount / 1000)
-        }
-        return String(format: "$%.0f", amount)
+        amount >= 1000
+            ? String(format: "$%.1fk", amount / 1000)
+            : String(format: "$%.0f", amount)
     }
 
     private func barHeight(for amount: Double) -> CGFloat {
-        let maxAmount = max(monthlyData.map(\.amount).max() ?? 1, 1)
-        let minHeight: CGFloat = amount > 0 ? 16 : 4
-        let maxHeight: CGFloat = 116
-        let normalized = amount / maxAmount
-        return amount > 0 ? max(minHeight, CGFloat(normalized) * maxHeight) : minHeight
+        guard amount > 0 else { return 4 }
+        let maxAmount = monthlyData.map(\.amount).max() ?? 1
+        let safeMax = maxAmount > 0 ? maxAmount : 1
+        return max(16, CGFloat(amount / safeMax) * 116)
     }
 }
+
+// MARK: - Donut Chart
 
 struct ModernDonutChartView: View {
     let data: [CategoryItem]
@@ -335,6 +376,7 @@ struct ModernDonutChartView: View {
                     item.color,
                     style: StrokeStyle(lineWidth: 22, lineCap: .butt, lineJoin: .round)
                 )
+                .rotationEffect(.degrees(-90))
             }
 
             Circle()
@@ -351,7 +393,6 @@ struct ModernDonutChartView: View {
                     .foregroundColor(AppPalette.secondaryText)
             }
         }
-        .rotationEffect(.degrees(-90))
     }
 
     private func startAngle(for index: Int) -> Angle {
@@ -364,6 +405,8 @@ struct ModernDonutChartView: View {
         return .degrees((currentTotal / total) * 360)
     }
 }
+
+// MARK: - Transaction Row
 
 struct ActivityTransactionRow: View {
     let item: TransactionItem
@@ -415,14 +458,16 @@ struct ActivityTransactionRow: View {
 
     private func iconName(for category: String) -> String {
         switch category {
-        case "Food": return "fork.knife"
+        case "Food":      return "fork.knife"
         case "Transport": return "car.fill"
-        case "Shopping": return "bag.fill"
-        case "Travel": return "airplane"
-        default: return "receipt"
+        case "Shopping":  return "bag.fill"
+        case "Travel":    return "airplane"
+        default:          return "receipt"
         }
     }
 }
+
+// MARK: - Donut Slice Shape
 
 struct ActivityDonutSlice: Shape {
     var startAngle: Angle

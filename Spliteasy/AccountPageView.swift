@@ -461,7 +461,7 @@ struct AccountPageView: View {
 
     private var feedbackSheet: some View {
         NavigationStack {
-            VStack(spacing: 18) {
+            VStack(spacing: 8) {
                 Text("Rate the app")
                     .font(.system(size: 22, weight: .bold))
                     .foregroundColor(AppPalette.primaryText)
