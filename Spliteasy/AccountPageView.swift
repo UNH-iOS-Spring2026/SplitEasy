@@ -9,6 +9,7 @@ import SwiftUI
 #if os(iOS)
 import UIKit
 #endif
+import FirebaseAuth
 
 private enum AccountKeyboardKind {
     case standard
@@ -105,18 +106,10 @@ struct AccountPageView: View {
                             Image(systemName: "bell.fill")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
-
-                            if !notifications.isEmpty {
-                                Circle()
-                                    .fill(Color(red: 0.67, green: 0.90, blue: 0.73))
-                                    .frame(width: 10, height: 10)
-                                    .offset(x: 10, y: -10)
-                            }
                         }
                         .frame(width: 40, height: 40)
                     }
                     .buttonStyle(.plain)
-
                     ThemeHeaderButton(showThemeMenu: $showThemeMenu)
                 }
             }
@@ -350,7 +343,7 @@ struct AccountPageView: View {
     private var quickActionsCard: some View {
         VStack(spacing: 12) {
             profileActionRow(
-                icon: "bell.badge",
+                icon: "bell",
                 title: "Notifications",
                 subtitle: "\(notifications.count) recent"
             ) {
@@ -492,63 +485,73 @@ struct AccountPageView: View {
 
     private var feedbackSheet: some View {
         NavigationStack {
-            VStack(spacing: 18) {
-                Text("Rate the app")
-                    .font(.system(size: 22, weight: .bold))
-                    .foregroundColor(AppPalette.primaryText)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 18) {
+                    VStack(spacing: 8) {
+                        Text("Rate the app")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(AppPalette.primaryText)
 
-                HStack(spacing: 14) {
-                    ForEach(1...5, id: \.self) { value in
-                        Button {
-                            feedbackRating = value
-                        } label: {
-                            Image(systemName: value <= feedbackRating ? "star.fill" : "star")
-                                .font(.system(size: 26, weight: .bold))
-                                .foregroundColor(.yellow)
-                        }
-                        .buttonStyle(.plain)
+                        Text("Share your experience with Spliteasy.")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppPalette.secondaryText)
+                            .multilineTextAlignment(.center)
                     }
-                }
 
-                TextEditor(text: $feedbackMessage)
-                    .frame(height: 160)
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(AppPalette.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(AppPalette.border, lineWidth: 1)
-                            )
-                    )
+                    HStack(spacing: 14) {
+                        ForEach(1...5, id: \.self) { value in
+                            Button {
+                                feedbackRating = value
+                            } label: {
+                                Image(systemName: value <= feedbackRating ? "star.fill" : "star")
+                                    .font(.system(size: 26, weight: .bold))
+                                    .foregroundColor(.yellow)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
 
-                Button {
-                    let trimmed = feedbackMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-                    onSubmitFeedback(feedbackRating, trimmed)
-                    feedbackRating = 0
-                    feedbackMessage = ""
-                    showFeedbackSheet = false
-                } label: {
-                    Text("Submit Feedback")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                    TextEditor(text: $feedbackMessage)
+                        .frame(minHeight: 160)
+                        .padding(10)
+                        .scrollContentBackground(.hidden)
                         .background(
-                            LinearGradient(
-                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(AppPalette.card)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(AppPalette.border, lineWidth: 1)
+                                )
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
-                .buttonStyle(.plain)
 
-                Spacer()
+                    Button {
+                        let trimmed = feedbackMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+                        onSubmitFeedback(feedbackRating, trimmed)
+                        feedbackRating = 0
+                        feedbackMessage = ""
+                        showFeedbackSheet = false
+                    } label: {
+                        Text("Submit Feedback")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(20)
+                .padding(.top, 8)
             }
-            .padding(20)
             .navigationTitle("Feedback")
+            .navigationBarTitleDisplayMode(.inline)
             .background(
                 LinearGradient(
                     colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
@@ -560,58 +563,71 @@ struct AccountPageView: View {
         }
         .presentationDetents([.medium, .large])
     }
-
     private var supportSheet: some View {
         NavigationStack {
-            VStack(spacing: 16) {
-                TextField("Subject", text: $supportSubject)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppPalette.primaryText)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 14)
-                    .background(fieldBackground)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 16) {
+                    VStack(spacing: 8) {
+                        Text("Contact Us")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(AppPalette.primaryText)
 
-                TextEditor(text: $supportMessage)
-                    .frame(height: 180)
-                    .padding(10)
-                    .background(
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .fill(AppPalette.card)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(AppPalette.border, lineWidth: 1)
-                            )
-                    )
+                        Text("Send your question and we’ll get back to you.")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(AppPalette.secondaryText)
+                            .multilineTextAlignment(.center)
+                    }
 
-                Button {
-                    onContactSupport(
-                        supportSubject.trimmingCharacters(in: .whitespacesAndNewlines),
-                        supportMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-                    )
-                    supportSubject = ""
-                    supportMessage = ""
-                    showSupportSheet = false
-                } label: {
-                    Text("Send Message")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundColor(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
+                    TextField("Subject", text: $supportSubject)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(AppPalette.primaryText)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 14)
+                        .background(fieldBackground)
+
+                    TextEditor(text: $supportMessage)
+                        .frame(minHeight: 180)
+                        .padding(10)
+                        .scrollContentBackground(.hidden)
                         .background(
-                            LinearGradient(
-                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(AppPalette.card)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                        .stroke(AppPalette.border, lineWidth: 1)
+                                )
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
-                .buttonStyle(.plain)
 
-                Spacer()
+                    Button {
+                        onContactSupport(
+                            supportSubject.trimmingCharacters(in: .whitespacesAndNewlines),
+                            supportMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+                        )
+                        supportSubject = ""
+                        supportMessage = ""
+                        showSupportSheet = false
+                    } label: {
+                        Text("Send Message")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                LinearGradient(
+                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(20)
+                .padding(.top, 8)
             }
-            .padding(20)
             .navigationTitle("Contact Us")
+            .navigationBarTitleDisplayMode(.inline)
             .background(
                 LinearGradient(
                     colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
@@ -623,7 +639,6 @@ struct AccountPageView: View {
         }
         .presentationDetents([.medium, .large])
     }
-
     private var resetPasswordSheet: some View {
         NavigationStack {
             VStack(spacing: 16) {
@@ -815,40 +830,42 @@ struct AccountPageView: View {
 
     #if os(iOS)
     private func uploadProfileImage(_ image: UIImage?) {
-        guard let image,
-              let data = image.jpegData(compressionQuality: 0.6) else { return }
+        guard let image else { return }
 
         clearProfileMessage()
         isUploadingProfileImage = true
 
-        FirebaseService.shared.uploadCurrentUserProfileImage(data: data) { result in
+        let userId = Auth.auth().currentUser?.uid ?? "unknown-user"
+
+        SupabaseStorageService.shared.uploadProfile(
+            image: image,
+            userId: userId
+        ) { url in
             DispatchQueue.main.async {
-                switch result {
-                case .success(let url):
-                    profileImageURL = url
+                isUploadingProfileImage = false
 
-                    FirebaseService.shared.updateCurrentUserProfileImageURL(url) { updateResult in
-                        DispatchQueue.main.async {
-                            isUploadingProfileImage = false
+                guard let url else {
+                    profileImageURL = ""
+                    profileMessage = "Failed to upload profile image."
+                    profileMessageColor = .red.opacity(0.85)
+                    return
+                }
 
-                            switch updateResult {
-                            case .success:
-                                profileMessage = "Profile image updated."
-                                profileMessageColor = .green.opacity(0.85)
+                // Save URL in Firestore
+                FirebaseService.shared.updateCurrentUserProfileImageURL(url) { result in
+                    DispatchQueue.main.async {
+                        switch result {
+                        case .success:
+                            profileImageURL = url
+                            profileMessage = "Profile image updated."
+                            profileMessageColor = .green.opacity(0.85)
 
-                            case .failure(let error):
-                                profileImageURL = ""
-                                profileMessage = error.localizedDescription
-                                profileMessageColor = .red.opacity(0.85)
-                            }
+                        case .failure(let error):
+                            profileImageURL = ""
+                            profileMessage = error.localizedDescription
+                            profileMessageColor = .red.opacity(0.85)
                         }
                     }
-
-                case .failure(let error):
-                    isUploadingProfileImage = false
-                    profileImageURL = ""
-                    profileMessage = error.localizedDescription
-                    profileMessageColor = .red.opacity(0.85)
                 }
             }
         }

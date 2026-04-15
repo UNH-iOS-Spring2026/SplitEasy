@@ -73,15 +73,10 @@ struct HomePageView: View {
                                     Circle()
                                         .stroke(Color.white.opacity(0.08), lineWidth: 1)
                                 )
-
+                            
                             Image(systemName: "bell.fill")
                                 .font(.system(size: 17, weight: .semibold))
                                 .foregroundColor(.white)
-
-                            Circle()
-                                .fill(Color(red: 0.67, green: 0.90, blue: 0.73))
-                                .frame(width: 10, height: 10)
-                                .offset(x: 10, y: -10)
                         }
                         .frame(width: 40, height: 40)
                     }

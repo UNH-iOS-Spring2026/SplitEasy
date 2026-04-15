@@ -12,6 +12,7 @@ import SwiftUI
 #if os(iOS)
 import UIKit
 #endif
+import FirebaseAuth
 
 struct AddExpensePageView: View {
     let selectedItem: BalanceItem?
@@ -56,6 +57,9 @@ struct AddExpensePageView: View {
     @State private var showAddMembersSheet = false
     @State private var selectedNewMemberIDs: Set<String> = []
     @State private var showDeleteGroupConfirm = false
+
+    @State private var receiptDetectedMerchant: String = ""
+    @State private var receiptDetectedCategory: String = ""
 
     #if os(iOS)
     @State private var receiptImage: UIImage?
@@ -218,6 +222,8 @@ struct AddExpensePageView: View {
             locationAddressText = ""
             latitude = nil
             longitude = nil
+            receiptDetectedMerchant = ""
+            receiptDetectedCategory = ""
             #if os(iOS)
             receiptImage = nil
             recognizedReceiptText = ""
@@ -330,6 +336,18 @@ struct AddExpensePageView: View {
                 Text(receiptScanMessage)
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(AppPalette.accentMid)
+            }
+
+            if !receiptDetectedMerchant.isEmpty {
+                Text("Merchant: \(receiptDetectedMerchant)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
+            }
+
+            if !receiptDetectedCategory.isEmpty {
+                Text("Suggested category: \(receiptDetectedCategory)")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
             }
 
             if !recognizedReceiptText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -1018,54 +1036,40 @@ extension AddExpensePageView {
 
         let amountToSave = isGroup ? enteredAmount : calculatedAmount
 
-        #if os(iOS)
-        if let image = receiptImage,
-           let data = image.jpegData(compressionQuality: 0.6) {
-            isUploadingReceipt = true
-            let expenseId = UUID().uuidString
+#if os(iOS)
+if let image = receiptImage {
+    isUploadingReceipt = true
+    let expenseId = UUID().uuidString
+    let currentUserId = Auth.auth().currentUser?.uid ?? "unknown-user"
 
-            FirebaseService.shared.uploadReceiptImage(expenseId: expenseId, data: data) { result in
-                DispatchQueue.main.async {
-                    isUploadingReceipt = false
+    SupabaseStorageService.shared.uploadReceipt(
+        image: image,
+        expenseId: expenseId,
+        userId: currentUserId
+    ) { url in
+        DispatchQueue.main.async {
+            isUploadingReceipt = false
+            receiptURL = url ?? ""
 
-                    switch result {
-                    case .success(let url):
-                        receiptURL = url
-                        onSaveExpense(
-                            selectedItem.id,
-                            descriptionText,
-                            amountToSave,
-                            activeDirection,
-                            draft,
-                            url,
-                            cleanedLocationName,
-                            cleanedLocationAddress,
-                            latitude,
-                            longitude
-                        )
+            onSaveExpense(
+                selectedItem.id,
+                descriptionText,
+                amountToSave,
+                activeDirection,
+                draft,
+                url,
+                cleanedLocationName,
+                cleanedLocationAddress,
+                latitude,
+                longitude
+            )
 
-                    case .failure:
-                        onSaveExpense(
-                            selectedItem.id,
-                            descriptionText,
-                            amountToSave,
-                            activeDirection,
-                            draft,
-                            nil,
-                            cleanedLocationName,
-                            cleanedLocationAddress,
-                            latitude,
-                            longitude
-                        )
-                    }
-
-                    resetAfterSave()
-                }
-            }
-            return
+            resetAfterSave()
         }
-        #endif
-
+    }
+    return
+}
+#endif
         onSaveExpense(
             selectedItem.id,
             descriptionText,
@@ -1088,6 +1092,8 @@ extension AddExpensePageView {
         locationAddressText = ""
         latitude = nil
         longitude = nil
+        receiptDetectedMerchant = ""
+        receiptDetectedCategory = ""
         paidAmountsText = [:]
         #if os(iOS)
         receiptImage = nil
@@ -1112,15 +1118,34 @@ extension AddExpensePageView {
                 case .success(let scan):
                     recognizedReceiptText = scan.recognizedText
 
+                    if let merchant = scan.detectedMerchantName,
+                       descriptionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        descriptionText = merchant
+                        receiptDetectedMerchant = merchant
+                    } else {
+                        receiptDetectedMerchant = scan.detectedMerchantName ?? ""
+                    }
+
+                    receiptDetectedCategory = scan.detectedCategory ?? ""
+
                     if let detectedAmount = scan.detectedAmount {
                         if amountText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                             amountText = String(format: "%.2f", detectedAmount)
-                            receiptScanMessage = "Detected total: $\(String(format: "%.2f", detectedAmount))"
+
+                            if !receiptDetectedMerchant.isEmpty {
+                                receiptScanMessage = "Detected \(receiptDetectedMerchant) · total $\(String(format: "%.2f", detectedAmount))"
+                            } else {
+                                receiptScanMessage = "Detected total: $\(String(format: "%.2f", detectedAmount))"
+                            }
                         } else {
                             receiptScanMessage = "Suggested total: $\(String(format: "%.2f", detectedAmount))"
                         }
                     } else {
-                        receiptScanMessage = "Could not detect a total amount from the receipt."
+                        if !receiptDetectedMerchant.isEmpty {
+                            receiptScanMessage = "Read receipt from \(receiptDetectedMerchant), but could not detect the total."
+                        } else {
+                            receiptScanMessage = "Could not detect a total amount from the receipt."
+                        }
                     }
 
                 case .failure:

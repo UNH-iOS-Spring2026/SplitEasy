@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3855E6CA2F8F050400DA9553 /* Auth in Frameworks */ = {isa = PBXBuildFile; productRef = 3855E6C92F8F050400DA9553 /* Auth */; };
+		3855E6CC2F8F050400DA9553 /* Functions in Frameworks */ = {isa = PBXBuildFile; productRef = 3855E6CB2F8F050400DA9553 /* Functions */; };
+		3855E6CE2F8F050400DA9553 /* PostgREST in Frameworks */ = {isa = PBXBuildFile; productRef = 3855E6CD2F8F050400DA9553 /* PostgREST */; };
+		3855E6D02F8F050400DA9553 /* Realtime in Frameworks */ = {isa = PBXBuildFile; productRef = 3855E6CF2F8F050400DA9553 /* Realtime */; };
+		3855E6D22F8F050400DA9553 /* Storage in Frameworks */ = {isa = PBXBuildFile; productRef = 3855E6D12F8F050400DA9553 /* Storage */; };
+		3855E6D42F8F050400DA9553 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 3855E6D32F8F050400DA9553 /* Supabase */; };
 		38C263C42F775C7600DC7A6F /* FirebaseAI in Frameworks */ = {isa = PBXBuildFile; productRef = 38C263C32F775C7600DC7A6F /* FirebaseAI */; };
 		38C263C62F775C7600DC7A6F /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 38C263C52F775C7600DC7A6F /* FirebaseAnalytics */; };
 		38C263C82F775C7600DC7A6F /* FirebaseAnalyticsCore in Frameworks */ = {isa = PBXBuildFile; productRef = 38C263C72F775C7600DC7A6F /* FirebaseAnalyticsCore */; };
@@ -63,6 +69,8 @@
 				38C263EC2F775C7600DC7A6F /* FirebaseMLModelDownloader in Frameworks */,
 				38C263DE2F775C7600DC7A6F /* FirebaseDynamicLinks in Frameworks */,
 				38C263CC2F775C7600DC7A6F /* FirebaseAnalyticsOnDeviceConversion in Frameworks */,
+				3855E6CA2F8F050400DA9553 /* Auth in Frameworks */,
+				3855E6D42F8F050400DA9553 /* Supabase in Frameworks */,
 				38C263D42F775C7600DC7A6F /* FirebaseAuth in Frameworks */,
 				38C263E02F775C7600DC7A6F /* FirebaseFirestore in Frameworks */,
 				38C263E22F775C7600DC7A6F /* FirebaseFirestoreCombine-Community in Frameworks */,
@@ -70,13 +78,17 @@
 				38C263E82F775C7600DC7A6F /* FirebaseInAppMessaging-Beta in Frameworks */,
 				38C263E62F775C7600DC7A6F /* FirebaseFunctionsCombine-Community in Frameworks */,
 				38C263D02F775C7600DC7A6F /* FirebaseAppCheck in Frameworks */,
+				3855E6CC2F8F050400DA9553 /* Functions in Frameworks */,
 				38C263F62F775C7600DC7A6F /* FirebaseStorageCombine-Community in Frameworks */,
+				3855E6D02F8F050400DA9553 /* Realtime in Frameworks */,
 				38C263F22F775C7600DC7A6F /* FirebaseRemoteConfig in Frameworks */,
 				38C263C82F775C7600DC7A6F /* FirebaseAnalyticsCore in Frameworks */,
 				38C263C42F775C7600DC7A6F /* FirebaseAI in Frameworks */,
 				38C263F02F775C7600DC7A6F /* FirebasePerformance in Frameworks */,
+				3855E6CE2F8F050400DA9553 /* PostgREST in Frameworks */,
 				38C263DA2F775C7600DC7A6F /* FirebaseCrashlytics in Frameworks */,
 				38C263D22F775C7600DC7A6F /* FirebaseAppDistribution-Beta in Frameworks */,
+				3855E6D22F8F050400DA9553 /* Storage in Frameworks */,
 				38C263D62F775C7600DC7A6F /* FirebaseAuthCombine-Community in Frameworks */,
 				38C263EE2F775C7600DC7A6F /* FirebaseMessaging in Frameworks */,
 				38C263EA2F775C7600DC7A6F /* FirebaseInstallations in Frameworks */,
@@ -149,6 +161,12 @@
 				38C263F32F775C7600DC7A6F /* FirebaseStorage */,
 				38C263F52F775C7600DC7A6F /* FirebaseStorageCombine-Community */,
 				38C263F72F775C7600DC7A6F /* FirebaseVertexAI */,
+				3855E6C92F8F050400DA9553 /* Auth */,
+				3855E6CB2F8F050400DA9553 /* Functions */,
+				3855E6CD2F8F050400DA9553 /* PostgREST */,
+				3855E6CF2F8F050400DA9553 /* Realtime */,
+				3855E6D12F8F050400DA9553 /* Storage */,
+				3855E6D32F8F050400DA9553 /* Supabase */,
 			);
 			productName = Spliteasy;
 			productReference = 384FC60C2F622EDE0096EE9F /* Spliteasy.app */;
@@ -180,6 +198,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				38C263C22F775C7600DC7A6F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 384FC60D2F622EDE0096EE9F /* Products */;
@@ -440,6 +459,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/supabase-community/supabase-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.5.1;
+			};
+		};
 		38C263C22F775C7600DC7A6F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -451,6 +478,36 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		3855E6C92F8F050400DA9553 /* Auth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Auth;
+		};
+		3855E6CB2F8F050400DA9553 /* Functions */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Functions;
+		};
+		3855E6CD2F8F050400DA9553 /* PostgREST */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = PostgREST;
+		};
+		3855E6CF2F8F050400DA9553 /* Realtime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Realtime;
+		};
+		3855E6D12F8F050400DA9553 /* Storage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Storage;
+		};
+		3855E6D32F8F050400DA9553 /* Supabase */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 3855E6C82F8F050400DA9553 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+			productName = Supabase;
+		};
 		38C263C32F775C7600DC7A6F /* FirebaseAI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 38C263C22F775C7600DC7A6F /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
