@@ -1,4 +1,3 @@
-// Login and signup page with forgot password support.
 //
 //  LoginPageView.swift
 //  Spliteasy
@@ -60,8 +59,6 @@ struct LoginPageView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 10)
 
-                Spacer()
-
                 VStack(spacing: 10) {
                     Text("SplitEasy")
                         .font(.system(size: 34, weight: .bold))
@@ -71,6 +68,7 @@ struct LoginPageView: View {
                         .font(.system(size: 16, weight: .medium))
                         .foregroundColor(AppPalette.secondaryText)
                 }
+                .padding(.top, 20)
 
                 Picker("", selection: $selectedMode) {
                     ForEach(AuthMode.allCases, id: \.self) { mode in
@@ -81,105 +79,18 @@ struct LoginPageView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 26)
 
-                VStack(spacing: 16) {
-                    if selectedMode == .signup {
-                        authField(title: "First Name", placeholder: "Enter first name", text: $firstName, kind: .name)
-                        authField(title: "Last Name", placeholder: "Enter last name", text: $lastName, kind: .name)
-                        authField(title: "Phone Number", placeholder: "(xxx) xxx-xxxx", text: $phoneNumber, kind: .phone)
-                        authField(title: "Email", placeholder: "Enter email", text: $signupEmail, kind: .email)
-
-                        passwordField(
-                            title: "Create Password",
-                            text: $password,
-                            placeholder: "Create your password",
-                            isVisible: $showSignupPassword
-                        )
-
-                        passwordField(
-                            title: "Confirm Password",
-                            text: $confirmPassword,
-                            placeholder: "Re-enter your password",
-                            isVisible: $showConfirmPassword
-                        )
-                    } else {
-                        authField(
-                            title: "Email or Phone Number",
-                            placeholder: "Enter email or phone number",
-                            text: $identifier,
-                            kind: .identifier
-                        )
-
-                        passwordField(
-                            title: "Password",
-                            text: $password,
-                            placeholder: "Enter password",
-                            isVisible: $showLoginPassword
-                        )
-
-                        HStack {
-                            Spacer()
-
-                            Button {
-                                showForgotPasswordPage = true
-                            } label: {
-                                Text("Forgot Password?")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(AppPalette.accentMid)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                if selectedMode == .signup {
+                    ScrollView(showsIndicators: false) {
+                        signupContent
+                            .padding(.top, 24)
+                            .padding(.bottom, 32)
                     }
-
-                    if !errorMessage.isEmpty {
-                        Text(errorMessage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.red.opacity(0.85))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    if !successMessage.isEmpty {
-                        Text(successMessage)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundColor(.green.opacity(0.90))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
+                    .scrollDismissesKeyboard(.interactively)
+                } else {
+                    loginContent
+                        .padding(.top, 24)
+                    Spacer()
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 24)
-
-                Button {
-                    handlePrimaryAction()
-                } label: {
-                    HStack(spacing: 10) {
-                        if isLoading {
-                            ProgressView()
-                                .tint(.white)
-                        }
-
-                        Text(selectedMode == .login ? "Login" : "Create Account")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundColor(.white)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [AppPalette.accentStart, AppPalette.accentEnd],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                    )
-                }
-                .buttonStyle(.plain)
-                .padding(.horizontal, 24)
-                .padding(.top, 26)
-                .disabled(isLoading || !canSubmit)
-                .opacity((isLoading || !canSubmit) ? 0.65 : 1.0)
-
-                Spacer()
             }
         }
         .sheet(isPresented: $showForgotPasswordPage) {
@@ -201,6 +112,150 @@ struct LoginPageView: View {
                 phoneNumber = formatted
             }
         }
+    }
+
+    private var signupContent: some View {
+        VStack(spacing: 16) {
+            authField(title: "First Name", placeholder: "Enter first name", text: $firstName, kind: .name)
+            authField(title: "Last Name", placeholder: "Enter last name", text: $lastName, kind: .name)
+            authField(title: "Phone Number", placeholder: "(xxx) xxx-xxxx", text: $phoneNumber, kind: .phone)
+            authField(title: "Email", placeholder: "Enter email", text: $signupEmail, kind: .email)
+
+            passwordField(
+                title: "Create Password",
+                text: $password,
+                placeholder: "Create your password",
+                isVisible: $showSignupPassword
+            )
+
+            passwordField(
+                title: "Confirm Password",
+                text: $confirmPassword,
+                placeholder: "Re-enter your password",
+                isVisible: $showConfirmPassword
+            )
+
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.red.opacity(0.85))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !successMessage.isEmpty {
+                Text(successMessage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.green.opacity(0.90))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button {
+                handlePrimaryAction()
+            } label: {
+                HStack(spacing: 10) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text("Create Account")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isLoading || !canSubmit)
+            .opacity((isLoading || !canSubmit) ? 0.65 : 1.0)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private var loginContent: some View {
+        VStack(spacing: 16) {
+            authField(
+                title: "Email or Phone Number",
+                placeholder: "Enter email or phone number",
+                text: $identifier,
+                kind: .identifier
+            )
+
+            passwordField(
+                title: "Password",
+                text: $password,
+                placeholder: "Enter password",
+                isVisible: $showLoginPassword
+            )
+
+            HStack {
+                Spacer()
+
+                Button {
+                    showForgotPasswordPage = true
+                } label: {
+                    Text("Forgot Password?")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(AppPalette.accentMid)
+                }
+                .buttonStyle(.plain)
+            }
+
+            if !errorMessage.isEmpty {
+                Text(errorMessage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.red.opacity(0.85))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if !successMessage.isEmpty {
+                Text(successMessage)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(.green.opacity(0.90))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Button {
+                handlePrimaryAction()
+            } label: {
+                HStack(spacing: 10) {
+                    if isLoading {
+                        ProgressView()
+                            .tint(.white)
+                    }
+
+                    Text("Login")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(.white)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [AppPalette.accentStart, AppPalette.accentEnd],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isLoading || !canSubmit)
+            .opacity((isLoading || !canSubmit) ? 0.65 : 1.0)
+        }
+        .padding(.horizontal, 24)
     }
 
     private var headerBar: some View {
@@ -517,13 +572,16 @@ struct LoginPageView: View {
                 }
             }
 
+            Spacer(minLength: 8)
+
             Button {
                 isVisible.wrappedValue.toggle()
             } label: {
-                Image(systemName: isVisible.wrappedValue ? "eye.slash" : "eye")
-                    .font(.system(size: 17, weight: .semibold))
+                Image(systemName: isVisible.wrappedValue ? "eye.slash.fill" : "eye.fill")
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundColor(AppPalette.secondaryText)
-                    .frame(width: 22, height: 22)
+                    .frame(width: 30, height: 30)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
         }

@@ -104,7 +104,7 @@ struct FriendDetailPageView: View {
             EditExpensePageView(
                 parentName: friend.name,
                 expense: expense,
-                onSave: { newDescription, newAmount, newLocationName, newLocationAddress, newLatitude, newLongitude, groupDraft in
+                onSave: { newDescription, newAmount, newLocationName, newLocationAddress, newLatitude, newLongitude, groupDraft, _, _ in
                     onUpdateExpense(
                         expense,
                         newDescription,
@@ -293,11 +293,29 @@ struct FriendDetailPageView: View {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(themePurple.opacity(0.10))
                 .frame(width: 50, height: 50)
-                .overlay(
-                    Image(systemName: expense.receiptURL.isEmpty ? "receipt" : "photo")
-                        .font(.system(size: 20, weight: .bold))
-                        .foregroundColor(themePurple)
-                )
+                .overlay {
+                    if let receiptThumbURL = URL(string: expense.receiptURL), !expense.receiptURL.isEmpty {
+                        AsyncImage(url: receiptThumbURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            default:
+                                Image(systemName: "photo")
+                                    .font(.system(size: 20, weight: .bold))
+                                    .foregroundColor(themePurple)
+                            }
+                        }
+                        .frame(width: 50, height: 50)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    } else {
+                        Image(systemName: "receipt")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(themePurple)
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(expense.description)

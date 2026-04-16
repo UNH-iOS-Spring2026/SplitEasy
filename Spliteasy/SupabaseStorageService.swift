@@ -7,10 +7,17 @@ import Foundation
 import UIKit
 import Supabase
 
+struct SupabaseReceiptUploadResult {
+    let url: String
+    let storagePath: String
+}
+
 final class SupabaseStorageService {
     static let shared = SupabaseStorageService()
 
     private let client: SupabaseClient
+    private let profileBucket = "profile-pictures"
+    private let receiptBucket = "Receipts"
 
     private init() {
         client = SupabaseClient(
@@ -19,11 +26,42 @@ final class SupabaseStorageService {
         )
     }
 
+    private func resizedImageIfNeeded(_ image: UIImage, maxDimension: CGFloat = 1600) -> UIImage {
+        let maxSide = max(image.size.width, image.size.height)
+        guard maxSide > maxDimension, maxSide > 0 else { return image }
+
+        let scale = maxDimension / maxSide
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
     private func normalizedJPEGData(
         from image: UIImage,
-        compression: CGFloat = 0.8
+        compression: CGFloat = 0.60,
+        maxDimension: CGFloat = 1600
     ) -> Data? {
-        image.jpegData(compressionQuality: compression)
+        let resized = resizedImageIfNeeded(image, maxDimension: maxDimension)
+        return resized.jpegData(compressionQuality: compression)
+    }
+
+    private func publicURLString(bucket: String, path: String) async throws -> String {
+        let url = try await client.storage
+            .from(bucket)
+            .getPublicURL(path: path)
+        return url.absoluteString
+    }
+
+    func storagePath(fromReceiptURL urlString: String) -> String? {
+        guard let url = URL(string: urlString) else { return nil }
+        let marker = "/storage/v1/object/public/\(receiptBucket)/"
+        if let range = url.absoluteString.range(of: marker) {
+            return String(url.absoluteString[range.upperBound...])
+        }
+        return nil
     }
 
     func uploadProfile(
@@ -31,7 +69,7 @@ final class SupabaseStorageService {
         userId: String,
         completion: @escaping (String?) -> Void
     ) {
-        guard let data = normalizedJPEGData(from: image, compression: 0.8) else {
+        guard let data = normalizedJPEGData(from: image, compression: 0.65, maxDimension: 1200) else {
             print("❌ Profile image conversion failed")
             completion(nil)
             return
@@ -39,13 +77,11 @@ final class SupabaseStorageService {
 
         let fileName = "\(UUID().uuidString).jpg"
         let path = "profiles/\(userId)/\(fileName)"
-        print("🚀 Uploading profile to path:", path)
-        print("🚀 Bucket:", "profile-pictures")
 
         Task {
             do {
                 _ = try await client.storage
-                    .from("profile-pictures")
+                    .from(profileBucket)
                     .upload(
                         path,
                         data: data,
@@ -55,13 +91,8 @@ final class SupabaseStorageService {
                         )
                     )
 
-                let url = try await client.storage
-                    .from("profile-pictures")
-                    .getPublicURL(path: path)
-
-                print("✅ Profile upload success")
-                print("🌍 Profile URL:", url.absoluteString)
-                completion(url.absoluteString)
+                let urlString = try await publicURLString(bucket: profileBucket, path: path)
+                completion(urlString)
             } catch {
                 print("❌ Profile upload failed localized:", error.localizedDescription)
                 print("❌ Profile upload failed full:", error)
@@ -74,22 +105,20 @@ final class SupabaseStorageService {
         image: UIImage,
         expenseId: String,
         userId: String,
-        completion: @escaping (String?) -> Void
+        completion: @escaping (SupabaseReceiptUploadResult?) -> Void
     ) {
-        guard let data = normalizedJPEGData(from: image, compression: 0.8) else {
+        guard let data = normalizedJPEGData(from: image, compression: 0.58, maxDimension: 1800) else {
             print("❌ Receipt image conversion failed")
             completion(nil)
             return
         }
 
         let path = "receipts/\(userId)/\(expenseId).jpg"
-        print("🚀 Uploading receipt to path:", path)
-        print("🚀 Bucket:", "Receipts")
 
         Task {
             do {
                 _ = try await client.storage
-                    .from("Receipts")
+                    .from(receiptBucket)
                     .upload(
                         path,
                         data: data,
@@ -99,17 +128,35 @@ final class SupabaseStorageService {
                         )
                     )
 
-                let url = try await client.storage
-                    .from("Receipts")
-                    .getPublicURL(path: path)
-
-                print("✅ Receipt upload success")
-                print("🌍 Receipt URL:", url.absoluteString)
-                completion(url.absoluteString)
+                let urlString = try await publicURLString(bucket: receiptBucket, path: path)
+                completion(SupabaseReceiptUploadResult(url: urlString, storagePath: path))
             } catch {
                 print("❌ Receipt upload failed localized:", error.localizedDescription)
                 print("❌ Receipt upload failed full:", error)
                 completion(nil)
+            }
+        }
+    }
+
+    func deleteReceipt(
+        storagePath: String,
+        completion: @escaping (Bool) -> Void
+    ) {
+        guard !storagePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            completion(true)
+            return
+        }
+
+        Task {
+            do {
+                try await client.storage
+                    .from(receiptBucket)
+                    .remove(paths: [storagePath])
+                completion(true)
+            } catch {
+                print("❌ Receipt delete failed localized:", error.localizedDescription)
+                print("❌ Receipt delete failed full:", error)
+                completion(false)
             }
         }
     }

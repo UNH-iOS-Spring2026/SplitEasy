@@ -16,26 +16,29 @@ struct WelcomeOnboardingView: View {
 
     private let pages: [OnboardingPageItem] = [
         OnboardingPageItem(
-            title: "Split expenses\neasily",
-            subtitle: "Track shared expenses with friends, roommates, and groups effortlessly.",
-            illustration: .peopleAndBills
+            imageName: "welcome1",
+            title: "Bills Made Simple",
+            subtitle: "Add expenses, split fairly, and settle up in seconds."
         ),
         OnboardingPageItem(
-            title: "No awkward money\nconversations",
-            subtitle: "Always know who owes what. Everything is calculated automatically.",
-            illustration: .chatAndBalances
+            imageName: "welcome2",
+            title: "No More Awkward Money Talks",
+            subtitle: "Keep everything clear, fair, and hassle-free with friends and groups."
         ),
         OnboardingPageItem(
-            title: "Settle up in seconds",
-            subtitle: "Record payments via cash or transfer and keep your balances clear.",
-            illustration: .walletAndMoney
+            imageName: "welcome3",
+            title: "Split Smartly",
+            subtitle: "Know exactly who pays what with a clean and friendly experience."
         )
     ]
-
+    
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [AppPalette.backgroundTop, AppPalette.backgroundBottom],
+                colors: [
+                    AppPalette.backgroundTop,
+                    AppPalette.backgroundBottom
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
@@ -46,16 +49,17 @@ struct WelcomeOnboardingView: View {
                     .padding(.horizontal, 24)
                     .padding(.top, 18)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 10)
 
                 onboardingPager
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 pageIndicator
-                    .padding(.top, 18)
+                    .padding(.top, 16)
 
                 bottomButton
                     .padding(.horizontal, 24)
-                    .padding(.top, 28)
+                    .padding(.top, 24)
 
                 if currentPage == pages.count - 1 {
                     loginRow
@@ -93,17 +97,16 @@ struct WelcomeOnboardingView: View {
             } label: {
                 Text("Skip")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundColor(AppPalette.secondaryText)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
+                    .foregroundColor(Color.white.opacity(0.88))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 11)
                     .background(
                         Capsule()
-                            .fill(AppPalette.card)
+                            .fill(Color.white.opacity(0.08))
                             .overlay(
                                 Capsule()
-                                    .stroke(AppPalette.border, lineWidth: 1)
+                                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
                             )
-                            .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 3)
                     )
             }
             .buttonStyle(.plain)
@@ -112,27 +115,62 @@ struct WelcomeOnboardingView: View {
 
     private func onboardingPage(_ page: OnboardingPageItem) -> some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 10)
+            Spacer(minLength: 4)
 
-            VStack(spacing: 0) {
-                Text(page.title)
-                    .font(.system(size: 30, weight: .bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(AppPalette.primaryText)
-                    .padding(.horizontal, 28)
+            ZStack(alignment: .bottomLeading) {
+                RoundedRectangle(cornerRadius: 34, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.04),
+                                Color.white.opacity(0.01)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 34, style: .continuous)
+                            .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.28), radius: 26, x: 0, y: 14)
 
-                Text(page.subtitle)
-                    .font(.system(size: 17, weight: .medium))
-                    .multilineTextAlignment(.center)
-                    .foregroundColor(AppPalette.secondaryText)
-                    .lineSpacing(4)
-                    .padding(.horizontal, 30)
-                    .padding(.top, 16)
-            }
+                Image(page.imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 500)
+                    .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+                    .overlay(
+                        LinearGradient(
+                            colors: [
+                                Color.black.opacity(0.08),
+                                Color.black.opacity(0.18),
+                                Color.black.opacity(0.62)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: 34, style: .continuous))
+                    )
 
-            page.illustration.view
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(page.title)
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundColor(.white)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(page.subtitle)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(Color.white.opacity(0.82))
+                        .lineSpacing(3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                 .padding(.horizontal, 24)
-                .padding(.top, 30)
+                .padding(.bottom, 24)
+                .padding(.trailing, 18)
+            }
+            .padding(.horizontal, 20)
 
             Spacer()
         }
@@ -142,8 +180,8 @@ struct WelcomeOnboardingView: View {
         HStack(spacing: 10) {
             ForEach(0..<pages.count, id: \.self) { index in
                 Capsule()
-                    .fill(index == currentPage ? AppPalette.accentMid : AppPalette.border)
-                    .frame(width: index == currentPage ? 24 : 8, height: 8)
+                    .fill(index == currentPage ? AppPalette.accentMid : Color.white.opacity(0.12))
+                    .frame(width: index == currentPage ? 26 : 8, height: 8)
                     .animation(.easeInOut(duration: 0.2), value: currentPage)
             }
         }
@@ -160,7 +198,7 @@ struct WelcomeOnboardingView: View {
             }
         } label: {
             Text(currentPage == pages.count - 1 ? "Get Started" : "Continue")
-                .font(.system(size: 19, weight: .bold))
+                .font(.system(size: 20, weight: .bold))
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 18)
@@ -171,8 +209,8 @@ struct WelcomeOnboardingView: View {
                         endPoint: .trailing
                     )
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadow(color: AppPalette.accentMid.opacity(0.20), radius: 10, x: 0, y: 5)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: AppPalette.accentMid.opacity(0.22), radius: 14, x: 0, y: 8)
         }
         .buttonStyle(.plain)
     }
@@ -196,287 +234,7 @@ struct WelcomeOnboardingView: View {
 }
 
 private struct OnboardingPageItem {
+    let imageName: String
     let title: String
     let subtitle: String
-    let illustration: OnboardingIllustration
-}
-
-private enum OnboardingIllustration {
-    case peopleAndBills
-    case chatAndBalances
-    case walletAndMoney
-
-    @ViewBuilder
-    var view: some View {
-        switch self {
-        case .peopleAndBills:
-            PeopleBillsIllustration()
-        case .chatAndBalances:
-            ChatBalancesIllustration()
-        case .walletAndMoney:
-            WalletMoneyIllustration()
-        }
-    }
-}
-
-private struct IllustrationContainer<Content: View>: View {
-    let content: Content
-
-    init(@ViewBuilder content: () -> Content) {
-        self.content = content()
-    }
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .fill(AppPalette.card)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 30, style: .continuous)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-                .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 6)
-
-            content
-                .padding(.horizontal, 18)
-                .padding(.vertical, 24)
-        }
-        .frame(height: 330)
-    }
-}
-
-private struct PeopleBillsIllustration: View {
-    var body: some View {
-        IllustrationContainer {
-            ZStack {
-                Circle()
-                    .fill(AppPalette.accentMid.opacity(0.08))
-                    .frame(width: 210, height: 210)
-                    .offset(y: 26)
-
-                floatingPaper(
-                    x: -88,
-                    y: -68,
-                    rotation: -14,
-                    icon: "dollarsign",
-                    tint: AppPalette.accentStart
-                )
-
-                floatingPaper(
-                    x: 0,
-                    y: -86,
-                    rotation: 8,
-                    icon: "list.bullet.clipboard",
-                    tint: .green
-                )
-
-                floatingPaper(
-                    x: 92,
-                    y: -58,
-                    rotation: 12,
-                    icon: "creditcard.fill",
-                    tint: AppPalette.accentEnd
-                )
-
-                HStack(spacing: 22) {
-                    person(
-                        circleColor: AppPalette.accentMid,
-                        cardColor: AppPalette.accentMid,
-                        accessory: "cup.and.saucer.fill"
-                    )
-
-                    person(
-                        circleColor: .orange,
-                        cardColor: .orange,
-                        accessory: "calculator"
-                    )
-                }
-                .offset(y: 34)
-            }
-        }
-    }
-
-    private func floatingPaper(
-        x: CGFloat,
-        y: CGFloat,
-        rotation: Double,
-        icon: String,
-        tint: Color
-    ) -> some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(AppPalette.softCard)
-            .frame(width: 72, height: 56)
-            .overlay(
-                Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundColor(tint)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(AppPalette.border, lineWidth: 1)
-            )
-            .rotationEffect(.degrees(rotation))
-            .offset(x: x, y: y)
-    }
-
-    private func person(
-        circleColor: Color,
-        cardColor: Color,
-        accessory: String
-    ) -> some View {
-        VStack(spacing: 10) {
-            Circle()
-                .fill(circleColor.opacity(0.18))
-                .frame(width: 76, height: 76)
-                .overlay(
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 36, weight: .bold))
-                        .foregroundColor(circleColor)
-                )
-
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(cardColor.opacity(0.14))
-                .frame(width: 96, height: 66)
-                .overlay(
-                    Image(systemName: accessory)
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundColor(cardColor)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-        }
-    }
-}
-
-private struct ChatBalancesIllustration: View {
-    var body: some View {
-        IllustrationContainer {
-            ZStack {
-                HStack(spacing: 22) {
-                    Circle()
-                        .fill(AppPalette.accentStart.opacity(0.18))
-                        .frame(width: 82, height: 82)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 34, weight: .bold))
-                                .foregroundColor(AppPalette.accentStart)
-                        )
-
-                    Circle()
-                        .fill(.orange.opacity(0.18))
-                        .frame(width: 82, height: 82)
-                        .overlay(
-                            Image(systemName: "person.fill")
-                                .font(.system(size: 34, weight: .bold))
-                                .foregroundColor(.orange)
-                        )
-                }
-                .offset(y: 42)
-
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(AppPalette.card)
-                    .frame(width: 200, height: 166)
-                    .overlay(
-                        VStack(spacing: 10) {
-                            balanceRow(name: "Andrew", amount: "$28.76")
-                            balanceRow(name: "Sarah", amount: "$22.55")
-                            balanceRow(name: "You owe", amount: "$91.25")
-                        }
-                        .padding(.horizontal, 14)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 22, style: .continuous)
-                            .stroke(AppPalette.border, lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 10, x: 0, y: 5)
-                    .offset(y: -10)
-            }
-        }
-    }
-
-    private func balanceRow(name: String, amount: String) -> some View {
-        HStack {
-            Text(name)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundColor(AppPalette.primaryText)
-
-            Spacer()
-
-            Text(amount)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundColor(AppPalette.secondaryText)
-        }
-        .padding(.vertical, 9)
-        .padding(.horizontal, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(AppPalette.softCard)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(AppPalette.border, lineWidth: 1)
-                )
-        )
-    }
-}
-
-private struct WalletMoneyIllustration: View {
-    var body: some View {
-        IllustrationContainer {
-            ZStack {
-                Circle()
-                    .fill(.green.opacity(0.16))
-                    .frame(width: 62, height: 62)
-                    .overlay(
-                        Image(systemName: "dollarsign.circle.fill")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.green)
-                    )
-                    .offset(x: 100, y: -18)
-
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.orange.opacity(0.18))
-                    .frame(width: 124, height: 70)
-                    .rotationEffect(.degrees(-12))
-                    .offset(x: 42, y: -50)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .stroke(AppPalette.border, lineWidth: 1)
-                            .rotationEffect(.degrees(-12))
-                            .offset(x: 42, y: -50)
-                    )
-
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [AppPalette.accentStart.opacity(0.85), AppPalette.accentEnd.opacity(0.95)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 190, height: 122)
-                    .overlay(
-                        HStack {
-                            Spacer()
-
-                            Circle()
-                                .fill(Color.white.opacity(0.38))
-                                .frame(width: 34, height: 34)
-                                .overlay(
-                                    Circle()
-                                        .fill(Color.white.opacity(0.72))
-                                        .frame(width: 14, height: 14)
-                                )
-                                .padding(.trailing, 22)
-                        }
-                    )
-                    .shadow(color: AppPalette.accentMid.opacity(0.12), radius: 8, x: 0, y: 4)
-
-                Image(systemName: "arrow.turn.up.left")
-                    .font(.system(size: 52, weight: .bold))
-                    .foregroundColor(AppPalette.accentMid)
-                    .offset(x: -92, y: 10)
-            }
-        }
-    }
 }

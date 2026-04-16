@@ -130,6 +130,7 @@ struct FirestoreExpenseHistoryRecord {
     let amount: Double
     let dateText: String
     let receiptURL: String
+    let receiptStoragePath: String
 
     let locationName: String
     let locationAddress: String
@@ -155,6 +156,7 @@ struct FirestoreExpenseHistoryRecord {
         self.amount = data["amount"] as? Double ?? 0
         self.dateText = data["dateText"] as? String ?? ""
         self.receiptURL = data["receiptURL"] as? String ?? ""
+        self.receiptStoragePath = data["receiptStoragePath"] as? String ?? ""
 
         self.locationName = data["locationName"] as? String ?? ""
         self.locationAddress = data["locationAddress"] as? String ?? ""
@@ -200,6 +202,7 @@ struct FirestoreExpensePayload {
     let activitySubtitle: String
     let groupDraft: GroupExpenseDraft?
     let receiptURL: String?
+    let receiptStoragePath: String?
 
     let locationName: String
     let locationAddress: String
@@ -263,6 +266,7 @@ final class FirebaseService {
         dateText: String,
         monthKey: String,
         receiptURL: String,
+        receiptStoragePath: String,
         locationName: String,
         locationAddress: String,
         latitude: Double?,
@@ -282,6 +286,7 @@ final class FirebaseService {
             "monthKey": monthKey,
             "createdAt": FieldValue.serverTimestamp(),
             "receiptURL": receiptURL,
+            "receiptStoragePath": receiptStoragePath,
             "isGroupMirror": true,
             "parentGroupExpenseId": parentGroupExpenseId,
             "groupDocumentId": groupDocumentId,
@@ -1095,6 +1100,7 @@ final class FirebaseService {
                     "yourNetAmount": payload.groupDraft?.yourNetAmount ?? 0,
                     "paidAmounts": payload.groupDraft?.paidAmounts ?? [:],
                     "receiptURL": payload.receiptURL ?? "",
+                    "receiptStoragePath": payload.receiptStoragePath ?? "",
                     "locationName": payload.locationName,
                     "locationAddress": payload.locationAddress,
                     "latitude": payload.latitude as Any,
@@ -1143,6 +1149,7 @@ final class FirebaseService {
         monthKey: String,
         groupDraft: GroupExpenseDraft,
         receiptURL: String?,
+        receiptStoragePath: String?,
         locationName: String,
         locationAddress: String,
         latitude: Double?,
@@ -1224,6 +1231,7 @@ final class FirebaseService {
                         "paidAmounts": groupDraft.paidAmounts,
                         "yourOwnShare": yourOwnShare,
                         "receiptURL": receiptURL ?? "",
+                        "receiptStoragePath": receiptStoragePath ?? "",
                         "groupName": groupName,
                         "locationName": locationName,
                         "locationAddress": locationAddress,
@@ -1287,6 +1295,7 @@ final class FirebaseService {
                                 dateText: dateText,
                                 monthKey: monthKey,
                                 receiptURL: receiptURL ?? "",
+                                receiptStoragePath: receiptStoragePath ?? "",
                                 locationName: locationName,
                                 locationAddress: locationAddress,
                                 latitude: latitude,

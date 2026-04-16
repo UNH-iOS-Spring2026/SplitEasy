@@ -71,6 +71,7 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
     let amount: Double
     let dateText: String
     let receiptURL: String
+    let receiptStoragePath: String
 
     let locationName: String
     let locationAddress: String
@@ -96,6 +97,7 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
         amount: Double,
         dateText: String,
         receiptURL: String = "",
+        receiptStoragePath: String = "",
         locationName: String = "",
         locationAddress: String = "",
         latitude: Double? = nil,
@@ -116,6 +118,7 @@ struct ExpenseEntry: Identifiable, Hashable, Sendable {
         self.amount = amount
         self.dateText = dateText
         self.receiptURL = receiptURL
+        self.receiptStoragePath = receiptStoragePath
         self.locationName = locationName
         self.locationAddress = locationAddress
         self.latitude = latitude

@@ -678,6 +678,7 @@ struct ContentView: View {
                             amount: $0.amount,
                             dateText: $0.dateText,
                             receiptURL: $0.receiptURL,
+                            receiptStoragePath: $0.receiptStoragePath,
                             locationName: $0.locationName,
                             locationAddress: $0.locationAddress,
                             latitude: $0.latitude,
@@ -725,6 +726,7 @@ struct ContentView: View {
                             amount: $0.amount,
                             dateText: $0.dateText,
                             receiptURL: $0.receiptURL,
+                            receiptStoragePath: $0.receiptStoragePath,
                             locationName: $0.locationName,
                             locationAddress: $0.locationAddress,
                             latitude: $0.latitude,
@@ -1224,9 +1226,14 @@ struct ContentView: View {
         }
     }
     private func deleteExpense(_ expense: ExpenseEntry, parent: BalanceItem) {
-        FirebaseService.shared.deleteExpense(expenseDocumentId: expense.editExpenseDocumentId) { result in
-            DispatchQueue.main.async {
-                switch result {
+        let storagePath = !expense.receiptStoragePath.isEmpty
+            ? expense.receiptStoragePath
+            : (SupabaseStorageService.shared.storagePath(fromReceiptURL: expense.receiptURL) ?? "")
+
+        let continueDeleteInFirestore = {
+            FirebaseService.shared.deleteExpense(expenseDocumentId: expense.editExpenseDocumentId) { result in
+                DispatchQueue.main.async {
+                    switch result {
                 case .success:
                     loadFriendsFromFirestore()
                     loadActivityFromFirestore()
@@ -1251,10 +1258,20 @@ struct ContentView: View {
                         )
                     }
 
-                case .failure(let error):
-                    print("❌ deleteExpense failed: \(error.localizedDescription)")
+                    case .failure(let error):
+                        print("❌ deleteExpense failed: \(error.localizedDescription)")
+                    }
                 }
             }
+        }
+
+        guard !storagePath.isEmpty else {
+            continueDeleteInFirestore()
+            return
+        }
+
+        SupabaseStorageService.shared.deleteReceipt(storagePath: storagePath) { _ in
+            continueDeleteInFirestore()
         }
     }
     private func saveExpense(
@@ -1264,6 +1281,7 @@ struct ContentView: View {
         direction: BalanceDirection,
         groupDraft: GroupExpenseDraft?,
         receiptURL: String?,
+        receiptStoragePath: String?,
         locationName: String,
         locationAddress: String,
         latitude: Double?,
@@ -1305,6 +1323,7 @@ struct ContentView: View {
                 activitySubtitle: subtitle,
                 groupDraft: nil,
                 receiptURL: receiptURL,
+                receiptStoragePath: receiptStoragePath,
                 locationName: locationName,
                 locationAddress: locationAddress,
                 latitude: latitude,
@@ -1361,6 +1380,7 @@ struct ContentView: View {
                     paidAmounts: ["YOU": amount]
                 ),
                 receiptURL: receiptURL,
+                receiptStoragePath: receiptStoragePath,
                 locationName: locationName,
                 locationAddress: locationAddress,
                 latitude: latitude,
@@ -1550,6 +1570,20 @@ struct ContentView: View {
     }
 
     private func submitFeedback(_ rating: Int, _ message: String) {
+        let emailBody = """
+        App: SplitEasy
+        Rating: \(rating)/5
+
+        Feedback:
+        \(message)
+
+        User: \(profileName)
+        Email: \(profileEmail)
+        """
+
+        sendEmail(subject: "App Feedback", body: emailBody)
+
+        // Keep Firebase save (optional but recommended)
         FirebaseService.shared.saveFeedback(rating: rating, message: message) { result in
             if case .success = result {
                 FirebaseService.shared.saveNotification(
@@ -1568,6 +1602,19 @@ struct ContentView: View {
     }
 
     private func contactSupport(_ subject: String, _ message: String) {
+        let emailBody = """
+        App: SplitEasy
+
+        Issue:
+        \(message)
+
+        User: \(profileName)
+        Email: \(profileEmail)
+        """
+
+        sendEmail(subject: subject.isEmpty ? "Support Request" : subject, body: emailBody)
+
+        // Keep Firebase backup
         FirebaseService.shared.saveSupportMessage(subject: subject, message: message) { result in
             if case .success = result {
                 FirebaseService.shared.saveNotification(
@@ -1644,6 +1691,19 @@ struct ContentView: View {
             showAddFriendPage = true
         } else {
             showCreateGroupPage = true
+        }
+    }
+    
+    private func sendEmail(subject: String, body: String) {
+        let adminEmail = "spliteasyadmin@gmail.com"
+
+        let formattedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let formattedBody = body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+
+        let urlString = "mailto:\(adminEmail)?subject=\(formattedSubject)&body=\(formattedBody)"
+
+        if let url = URL(string: urlString) {
+            UIApplication.shared.open(url)
         }
     }
 

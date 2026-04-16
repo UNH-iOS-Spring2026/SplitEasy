@@ -24,6 +24,7 @@ struct AddExpensePageView: View {
         BalanceDirection,
         GroupExpenseDraft?,
         String?,
+        String?,
         String,
         String,
         Double?,
@@ -71,6 +72,7 @@ struct AddExpensePageView: View {
 
     @State private var showReceiptPicker = false
     @State private var receiptURL: String = ""
+    @State private var receiptStoragePath: String = ""
     @State private var isUploadingReceipt = false
 
     var body: some View {
@@ -181,7 +183,7 @@ struct AddExpensePageView: View {
         }
         .onChange(of: receiptImage) { _, newImage in
             guard let image = newImage else { return }
-            scanReceiptText(from: image)
+            uploadAndScanReceipt(image)
         }
         #endif
         .confirmationDialog(
@@ -232,6 +234,7 @@ struct AddExpensePageView: View {
             showReceiptTextSheet = false
             #endif
             receiptURL = ""
+            receiptStoragePath = ""
             isUploadingReceipt = false
             selectedNewMemberIDs = []
         }
@@ -1036,47 +1039,14 @@ extension AddExpensePageView {
 
         let amountToSave = isGroup ? enteredAmount : calculatedAmount
 
-#if os(iOS)
-if let image = receiptImage {
-    isUploadingReceipt = true
-    let expenseId = UUID().uuidString
-    let currentUserId = Auth.auth().currentUser?.uid ?? "unknown-user"
-
-    SupabaseStorageService.shared.uploadReceipt(
-        image: image,
-        expenseId: expenseId,
-        userId: currentUserId
-    ) { url in
-        DispatchQueue.main.async {
-            isUploadingReceipt = false
-            receiptURL = url ?? ""
-
-            onSaveExpense(
-                selectedItem.id,
-                descriptionText,
-                amountToSave,
-                activeDirection,
-                draft,
-                url,
-                cleanedLocationName,
-                cleanedLocationAddress,
-                latitude,
-                longitude
-            )
-
-            resetAfterSave()
-        }
-    }
-    return
-}
-#endif
         onSaveExpense(
             selectedItem.id,
             descriptionText,
             amountToSave,
             activeDirection,
             draft,
-            nil,
+            receiptURL.isEmpty ? nil : receiptURL,
+            receiptStoragePath.isEmpty ? nil : receiptStoragePath,
             cleanedLocationName,
             cleanedLocationAddress,
             latitude,
@@ -1103,9 +1073,44 @@ if let image = receiptImage {
         showReceiptTextSheet = false
         #endif
         receiptURL = ""
+        receiptStoragePath = ""
     }
 
     #if os(iOS)
+    private func uploadAndScanReceipt(_ image: UIImage) {
+        scanReceiptText(from: image)
+
+        let currentUserId = Auth.auth().currentUser?.uid ?? "unknown-user"
+        let tempExpenseId = UUID().uuidString
+
+        isUploadingReceipt = true
+        receiptScanMessage = "Uploading and reading receipt..."
+
+        SupabaseStorageService.shared.uploadReceipt(
+            image: image,
+            expenseId: tempExpenseId,
+            userId: currentUserId
+        ) { result in
+            DispatchQueue.main.async {
+                isUploadingReceipt = false
+
+                if let result {
+                    receiptURL = result.url
+                    receiptStoragePath = result.storagePath
+
+                    if receiptScanMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        receiptScanMessage == "Uploading and reading receipt..." {
+                        receiptScanMessage = "Receipt uploaded successfully."
+                    }
+                } else {
+                    receiptURL = ""
+                    receiptStoragePath = ""
+                    receiptScanMessage = "Receipt selected, but upload failed. You can still save without it or try again."
+                }
+            }
+        }
+    }
+
     private func scanReceiptText(from image: UIImage) {
         isScanningReceipt = true
         receiptScanMessage = ""
