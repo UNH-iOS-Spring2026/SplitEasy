@@ -19,7 +19,6 @@ final class SupabaseStorageService {
         )
     }
 
-    // Converts any picked UIImage (jpg, jpeg, png, heic) into JPEG data
     private func normalizedJPEGData(
         from image: UIImage,
         compression: CGFloat = 0.8
@@ -27,7 +26,6 @@ final class SupabaseStorageService {
         image.jpegData(compressionQuality: compression)
     }
 
-    // MARK: - Profile Upload
     func uploadProfile(
         image: UIImage,
         userId: String,
@@ -39,8 +37,10 @@ final class SupabaseStorageService {
             return
         }
 
-        let path = "profiles/\(userId).jpg"
+        let fileName = "\(UUID().uuidString).jpg"
+        let path = "profiles/\(userId)/\(fileName)"
         print("🚀 Uploading profile to path:", path)
+        print("🚀 Bucket:", "profile-pictures")
 
         Task {
             do {
@@ -63,13 +63,13 @@ final class SupabaseStorageService {
                 print("🌍 Profile URL:", url.absoluteString)
                 completion(url.absoluteString)
             } catch {
-                print("❌ Profile upload failed:", error)
+                print("❌ Profile upload failed localized:", error.localizedDescription)
+                print("❌ Profile upload failed full:", error)
                 completion(nil)
             }
         }
     }
 
-    // MARK: - Receipt Upload
     func uploadReceipt(
         image: UIImage,
         expenseId: String,
@@ -84,6 +84,7 @@ final class SupabaseStorageService {
 
         let path = "receipts/\(userId)/\(expenseId).jpg"
         print("🚀 Uploading receipt to path:", path)
+        print("🚀 Bucket:", "Receipts")
 
         Task {
             do {
@@ -106,7 +107,8 @@ final class SupabaseStorageService {
                 print("🌍 Receipt URL:", url.absoluteString)
                 completion(url.absoluteString)
             } catch {
-                print("❌ Receipt upload failed:", error)
+                print("❌ Receipt upload failed localized:", error.localizedDescription)
+                print("❌ Receipt upload failed full:", error)
                 completion(nil)
             }
         }

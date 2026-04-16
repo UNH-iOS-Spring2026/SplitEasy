@@ -1,6 +1,5 @@
 // Login and signup page with forgot password support.
 //
-//
 //  LoginPageView.swift
 //  Spliteasy
 //
@@ -29,6 +28,10 @@ struct LoginPageView: View {
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var successMessage = ""
+
+    @State private var showLoginPassword = false
+    @State private var showSignupPassword = false
+    @State private var showConfirmPassword = false
 
     let onLogin: () -> Void
     let onBack: (() -> Void)?
@@ -88,13 +91,15 @@ struct LoginPageView: View {
                         passwordField(
                             title: "Create Password",
                             text: $password,
-                            placeholder: "Create your password"
+                            placeholder: "Create your password",
+                            isVisible: $showSignupPassword
                         )
 
                         passwordField(
                             title: "Confirm Password",
                             text: $confirmPassword,
-                            placeholder: "Re-enter your password"
+                            placeholder: "Re-enter your password",
+                            isVisible: $showConfirmPassword
                         )
                     } else {
                         authField(
@@ -107,7 +112,8 @@ struct LoginPageView: View {
                         passwordField(
                             title: "Password",
                             text: $password,
-                            placeholder: "Enter password"
+                            placeholder: "Enter password",
+                            isVisible: $showLoginPassword
                         )
 
                         HStack {
@@ -183,6 +189,9 @@ struct LoginPageView: View {
             clearMessages()
             password = ""
             confirmPassword = ""
+            showLoginPassword = false
+            showSignupPassword = false
+            showConfirmPassword = false
         }
         .onChange(of: phoneNumber) { _, newValue in
             let formatted = FirebaseService.formattedPhoneNumber(
@@ -260,10 +269,15 @@ struct LoginPageView: View {
 
     private func handlePrimaryAction() {
         clearMessages()
-        isLoading = true
 
         switch selectedMode {
         case .login:
+            if let validationError = validateLoginFields() {
+                errorMessage = validationError
+                return
+            }
+
+            isLoading = true
             FirebaseService.shared.loginUser(
                 identifier: trimmedIdentifier,
                 password: password
@@ -281,12 +295,12 @@ struct LoginPageView: View {
             }
 
         case .signup:
-            guard password == confirmPassword else {
-                isLoading = false
-                errorMessage = "Passwords do not match."
+            if let validationError = validateSignupFields() {
+                errorMessage = validationError
                 return
             }
 
+            isLoading = true
             FirebaseService.shared.registerUser(
                 firstName: trimmedFirstName,
                 lastName: trimmedLastName,
@@ -308,6 +322,9 @@ struct LoginPageView: View {
                         lastName = ""
                         phoneNumber = ""
                         signupEmail = ""
+                        showLoginPassword = false
+                        showSignupPassword = false
+                        showConfirmPassword = false
 
                     case .failure(let error):
                         errorMessage = error.localizedDescription
@@ -315,6 +332,71 @@ struct LoginPageView: View {
                 }
             }
         }
+    }
+
+    private func validateLoginFields() -> String? {
+        if trimmedIdentifier.isEmpty {
+            return "Please enter your email or phone number."
+        }
+
+        if password.isEmpty {
+            return "Please enter your password."
+        }
+
+        if !trimmedIdentifier.contains("@") {
+            let digits = FirebaseService.normalizedPhoneDigits(trimmedIdentifier)
+            if !digits.isEmpty && digits.count != 10 {
+                return "Please enter a valid 10-digit phone number or a valid email address."
+            }
+        } else if !isValidEmail(trimmedIdentifier) {
+            return "Please enter a valid email address."
+        }
+
+        return nil
+    }
+
+    private func validateSignupFields() -> String? {
+        if trimmedFirstName.isEmpty {
+            return "Please enter your first name."
+        }
+
+        if trimmedLastName.isEmpty {
+            return "Please enter your last name."
+        }
+
+        if cleanedPhoneDigits.count != 10 {
+            return "Please enter a valid 10-digit phone number."
+        }
+
+        if trimmedSignupEmail.isEmpty {
+            return "Please enter your email address."
+        }
+
+        if !isValidEmail(trimmedSignupEmail) {
+            return "Please enter a valid email address."
+        }
+
+        if password.count < 6 {
+            return "Password must be at least 6 characters."
+        }
+
+        if confirmPassword.isEmpty {
+            return "Please confirm your password."
+        }
+
+        if password != confirmPassword {
+            return "Passwords do not match."
+        }
+
+        return nil
+    }
+
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailPredicate = NSPredicate(
+            format: "SELF MATCHES[c] %@",
+            "^[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}$"
+        )
+        return emailPredicate.evaluate(with: email)
     }
 
     private func clearMessages() {
@@ -388,14 +470,19 @@ struct LoginPageView: View {
         #endif
     }
 
-    private func passwordField(title: String, text: Binding<String>, placeholder: String) -> some View {
+    private func passwordField(
+        title: String,
+        text: Binding<String>,
+        placeholder: String,
+        isVisible: Binding<Bool>
+    ) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(AppPalette.secondaryText)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            securePasswordField(text: text, placeholder: placeholder)
+            passwordInputField(text: text, placeholder: placeholder, isVisible: isVisible)
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(AppPalette.primaryText)
                 .padding(.horizontal, 16)
@@ -411,16 +498,35 @@ struct LoginPageView: View {
         }
     }
 
-    @ViewBuilder
-    private func securePasswordField(text: Binding<String>, placeholder: String) -> some View {
-        #if os(iOS)
-        SecureField(placeholder, text: text)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled(true)
-            .textContentType(.oneTimeCode)
-        #else
-        SecureField(placeholder, text: text)
-        #endif
+    private func passwordInputField(
+        text: Binding<String>,
+        placeholder: String,
+        isVisible: Binding<Bool>
+    ) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if isVisible.wrappedValue {
+                    TextField(placeholder, text: text)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                } else {
+                    SecureField(placeholder, text: text)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .textContentType(.oneTimeCode)
+                }
+            }
+
+            Button {
+                isVisible.wrappedValue.toggle()
+            } label: {
+                Image(systemName: isVisible.wrappedValue ? "eye.slash" : "eye")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(AppPalette.secondaryText)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(.plain)
+        }
     }
 }
 
