@@ -40,7 +40,7 @@ struct LoginPageView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 25) {
+            VStack(spacing: 22) {
                 Spacer()
 
                 VStack(spacing: 10) {
