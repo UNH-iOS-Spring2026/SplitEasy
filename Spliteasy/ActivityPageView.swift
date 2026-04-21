@@ -91,7 +91,7 @@ struct ActivityPageView: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.horizontal, 20)
         .padding(.top, 12)
-        .padding(.bottom, 5)
+        .padding(.bottom, 4)
     }
 
     private var chartCard: some View {
