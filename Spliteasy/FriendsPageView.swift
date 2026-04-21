@@ -1,7 +1,6 @@
 //
 //  FriendsPageView.swift
 //  Spliteasy
-//
 //  Created by SIDHARTHA JAVVADI on 3/24/26.
 //
 // Friends/groups overview page with search, filter, and summary information.
@@ -46,8 +45,8 @@ struct FriendsPageView: View {
         } content: {
             VStack(spacing: 0) {
                 searchBar
-                    .padding(.top, 14)
-                    .padding(.horizontal, 16)
+                    .padding(.top, 13)
+                    .padding(.horizontal, 15)
 
                 summaryCard
                     .padding(.top, 12)
@@ -197,7 +196,7 @@ struct FriendsPageView: View {
                 sectionButton(title: "Groups", type: .groups)
             }
             .padding(.horizontal, 6)
-            .padding(.top, 4)
+            .padding(.top, 3)
             .padding(.bottom, 12)
         }
         .background(
