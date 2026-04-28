@@ -92,7 +92,7 @@ struct EditExpensePageView: View {
                 }
 
                 deleteButton
-                Spacer(minLength: 122)
+                Spacer(minLength: 120)
             }
             .padding(.horizontal, 20)
             .padding(.top, 20)
