@@ -90,10 +90,10 @@ struct EditExpensePageView: View {
                 }
                 
                 deleteButton
-                Spacer(minLength: 110)
+                Spacer(minLength: 112)
             }
             .padding(.horizontal, 20)
-            .padding(.top, 16)
+            .padding(.top, 15)
         }
         .sheet(isPresented: $showPaidByPicker) {
             EditGroupMemberPickerSheet(
