@@ -280,7 +280,7 @@ struct LoginPageView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Color.clear.frame(width: 46, height: 46)
+                Color.clear.frame(width: 45, height: 45)
             }
 
             Spacer()
