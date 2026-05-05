@@ -72,8 +72,8 @@ struct CreateGroupPageView: View {
                 .fill(AppPalette.border)
                 .frame(height: 1)
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 18)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 20)
         .background(cardBackground(cornerRadius: 22))
     }
 
